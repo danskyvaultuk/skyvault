@@ -24,6 +24,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
           const email = credentials.email as string;
+          if (!email.endsWith("@skyvaultuk.com")) return null;
           console.log("[dev-login] Looking up:", email);
           // Look up the user in the database by email
           const user = await prisma.user.findUnique({
@@ -54,6 +55,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     strategy: "jwt",
   },
   callbacks: {
+    async signIn({ user }) {
+      const email = user.email ?? "";
+      return email.endsWith("@skyvaultuk.com");
+    },
     async jwt({ token, user }) {
       // On first sign-in, `user` is populated — copy id and role into the token
       if (user) {

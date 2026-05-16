@@ -126,7 +126,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       {isClaimed && (
         <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4 mb-5">
           <h2 className="font-semibold text-green-800 mb-3">Customer contact</h2>
-          <div className="space-y-1 text-sm">
+          <div className="space-y-1 text-sm text-gray-900">
             <p><span className="text-green-700 font-medium">Name:</span> {lead.survey.customer.name ?? "—"}</p>
             <p><span className="text-green-700 font-medium">Email:</span> {lead.survey.customer.email}</p>
             {lead.survey.customer.phone && (
