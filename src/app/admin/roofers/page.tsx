@@ -12,7 +12,7 @@ export default async function AdminRoofersPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Roofer Verification</h1>
         <p className="text-sm text-gray-500">{roofers.length} roofer{roofers.length !== 1 ? "s" : ""} registered</p>
@@ -23,8 +23,8 @@ export default async function AdminRoofersPage() {
           No roofers registered yet.
         </div>
       ) : (
-        <div className="bg-white border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white border rounded-xl overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b bg-gray-50">
                 <th className="text-left px-5 py-3 font-medium text-gray-600">Roofer</th>

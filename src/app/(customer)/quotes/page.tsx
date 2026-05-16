@@ -32,7 +32,7 @@ export default async function QuotesPage() {
   });
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-4 md:p-8 max-w-2xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Quote requests</h1>
       <p className="text-gray-500 mb-8">
         Roofers who have claimed your survey leads will appear here.

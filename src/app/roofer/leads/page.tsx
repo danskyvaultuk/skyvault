@@ -31,7 +31,7 @@ export default async function RooferLeadsPage() {
   const claimedLeadIds = new Set(myClaims.map((c) => c.leadId));
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 md:p-8 max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Available Leads</h1>
       <p className="text-gray-500 mb-6">
         Roof surveys in your area that need a quote.
