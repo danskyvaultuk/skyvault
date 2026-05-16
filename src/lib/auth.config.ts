@@ -1,6 +1,7 @@
 // Edge-safe auth config — no Prisma, no database adapter.
 // Used by middleware only. The full config (with PrismaAdapter) lives in auth.ts.
 import type { NextAuthConfig } from "next-auth";
+import type { Role } from "@prisma/client";
 
 export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
@@ -19,7 +20,7 @@ export const authConfig: NextAuthConfig = {
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id as string;
-        session.user.role = token.role as string;
+        session.user.role = token.role as Role;
       }
       return session;
     },
