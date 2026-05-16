@@ -12,15 +12,13 @@ export const authConfig: NextAuthConfig = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        // @ts-expect-error role is added by the full auth config
-        token.role = user.role;
+        token.role = (user as Record<string, unknown>).role as string;
       }
       return token;
     },
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id as string;
-        // @ts-expect-error role is added by the full auth config
         session.user.role = token.role as string;
       }
       return session;
