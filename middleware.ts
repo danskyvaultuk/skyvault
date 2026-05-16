@@ -22,18 +22,19 @@ function getDashboard(role: string): string {
 }
 
 export default auth((req) => {
+  const { pathname } = req.nextUrl;
+
+  const isPublic =
+    pathname === "/" ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/verify") ||
+    pathname.startsWith("/api/auth");
+
+  if (isPublic) return NextResponse.next();
+
   try {
-    const { pathname } = req.nextUrl;
     const session = req.auth;
-
-    const isPublic =
-      pathname === "/" ||
-      pathname.startsWith("/login") ||
-      pathname.startsWith("/register") ||
-      pathname.startsWith("/verify") ||
-      pathname.startsWith("/api/auth");
-
-    if (isPublic) return NextResponse.next();
 
     if (!session) {
       return NextResponse.redirect(new URL("/login", req.url));
