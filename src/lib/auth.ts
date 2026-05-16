@@ -24,7 +24,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             return null;
           }
           const email = credentials.email as string;
-          if (!email.endsWith("@skyvaultuk.com")) return null;
           console.log("[dev-login] Looking up:", email);
           // Look up the user in the database by email
           const user = await prisma.user.findUnique({
