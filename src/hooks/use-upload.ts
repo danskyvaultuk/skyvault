@@ -81,16 +81,16 @@ export function useUpload(surveyId: string) {
             xhr.send(file);
           });
 
-          return 1; // successfully uploaded
+          return 1 as number; // successfully uploaded
         } catch (err) {
           updateFile(index, { status: "error", error: (err as Error).message });
-          return 0;
+          return 0 as number;
         }
       })
     );
 
     setUploading(false);
-    return results.reduce((sum, n) => sum + n, 0);
+    return results.reduce((sum: number, n: number) => sum + n, 0);
   }, [files, surveyId]);
 
   const removeFile = useCallback((index: number) => {
