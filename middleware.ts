@@ -1,14 +1,25 @@
-import { auth } from "@/lib/auth";
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth.config";
 import { NextResponse } from "next/server";
-import type { Role } from "@prisma/client";
 
-const ROLE_PREFIXES: Record<string, Role> = {
+const { auth } = NextAuth(authConfig);
+
+const ROLE_PREFIXES: Record<string, string> = {
   "/roofer": "roofer",
   "/drone": "drone",
   "/admin": "admin",
 };
 
 const CUSTOMER_PATHS = ["/dashboard", "/properties", "/surveys", "/quotes"];
+
+function getDashboard(role: string): string {
+  switch (role) {
+    case "roofer": return "/roofer/dashboard";
+    case "drone":  return "/drone/dashboard";
+    case "admin":  return "/admin/dashboard";
+    default:       return "/dashboard";
+  }
+}
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -17,6 +28,7 @@ export default auth((req) => {
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
     pathname.startsWith("/verify") ||
     pathname.startsWith("/api/auth");
 
@@ -26,7 +38,7 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  const role = session.user.role;
+  const role = session.user.role as string;
 
   for (const [prefix, requiredRole] of Object.entries(ROLE_PREFIXES)) {
     if (pathname.startsWith(prefix)) {
@@ -43,19 +55,6 @@ export default auth((req) => {
 
   return NextResponse.next();
 });
-
-function getDashboard(role: Role): string {
-  switch (role) {
-    case "roofer":
-      return "/roofer/dashboard";
-    case "drone":
-      return "/drone/dashboard";
-    case "admin":
-      return "/admin/dashboard";
-    default:
-      return "/dashboard";
-  }
-}
 
 export const config = {
   matcher: [
