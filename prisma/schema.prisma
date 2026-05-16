@@ -1,0 +1,295 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  customer
+  roofer
+  drone
+  admin
+}
+
+enum PropertyType {
+  residential
+  commercial
+}
+
+enum SurveyType {
+  self_upload
+  drone_capture
+}
+
+enum SurveyStatus {
+  draft
+  pending
+  analysing
+  complete
+  failed
+}
+
+enum ImageValidationStatus {
+  pending
+  valid
+  invalid
+}
+
+enum ReportStatus {
+  draft
+  published
+  overridden
+}
+
+enum LeadStatus {
+  open
+  closed
+}
+
+enum LeadClaimStatus {
+  interested
+  quoted
+  won
+  lost
+}
+
+enum DroneJobStatus {
+  posted
+  accepted
+  in_progress
+  images_uploaded
+  complete
+  cancelled
+}
+
+enum SubscriptionPlan {
+  basic
+  pro
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  cancelled
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  role      Role     @default(customer)
+  company   String?
+  postcode  String?
+  phone     String?
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  properties   Property[]
+  surveys      Survey[]      @relation("CustomerSurveys")
+  images       Image[]
+  subscription Subscription?
+  leadClaims   LeadClaim[]
+  droneJobs    DroneJob[]    @relation("OperatorJobs")
+
+  @@index([role])
+  @@index([postcode])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Property {
+  id        String       @id @default(cuid())
+  ownerId   String
+  address   String
+  postcode  String
+  town      String?
+  type      PropertyType @default(residential)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  surveys Survey[]
+
+  @@index([postcode])
+  @@index([ownerId])
+}
+
+model Survey {
+  id         String       @id @default(cuid())
+  propertyId String
+  customerId String
+  type       SurveyType
+  status     SurveyStatus @default(draft)
+  notes      String?      @db.Text
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  customer User      @relation("CustomerSurveys", fields: [customerId], references: [id])
+  images   Image[]
+  report   Report?
+  droneJob DroneJob?
+  lead     Lead?
+
+  @@index([customerId])
+  @@index([propertyId])
+  @@index([status])
+}
+
+model Image {
+  id               String                @id @default(cuid())
+  surveyId         String
+  uploadedById     String
+  s3Key            String                @unique
+  originalFilename String?
+  mimeType         String                @default("image/jpeg")
+  sizeBytes        Int?
+  validationStatus ImageValidationStatus @default(pending)
+  validationNotes  String?
+  sortOrder        Int                   @default(0)
+  createdAt        DateTime              @default(now())
+
+  survey     Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  uploadedBy User   @relation(fields: [uploadedById], references: [id])
+
+  @@index([surveyId])
+}
+
+model Report {
+  id                     String       @id @default(cuid())
+  surveyId               String       @unique
+  conditionScore         Int
+  defectsJson            Json
+  estimatedRemainingLife Int?
+  recommendations        Json
+  confidence             String
+  rawAiResponse          Json?
+  pdfS3Key               String?
+  status                 ReportStatus @default(draft)
+  adminNotes             String?      @db.Text
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  survey Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  lead   Lead?
+
+  @@index([conditionScore])
+}
+
+model Lead {
+  id         String     @id @default(cuid())
+  surveyId   String     @unique
+  reportId   String     @unique
+  postcode   String
+  maxRoofers Int        @default(3)
+  status     LeadStatus @default(open)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  survey Survey     @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  report Report     @relation(fields: [reportId], references: [id])
+  claims LeadClaim[]
+
+  @@index([postcode])
+  @@index([status])
+}
+
+model LeadClaim {
+  id          String          @id @default(cuid())
+  leadId      String
+  rooferId    String
+  status      LeadClaimStatus @default(interested)
+  quoteAmount Decimal?        @db.Decimal(10, 2)
+  notes       String?         @db.Text
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  roofer User @relation(fields: [rooferId], references: [id])
+
+  @@unique([leadId, rooferId])
+  @@index([rooferId])
+}
+
+model DroneJob {
+  id           String         @id @default(cuid())
+  surveyId     String         @unique
+  operatorId   String?
+  status       DroneJobStatus @default(posted)
+  postcode     String
+  payoutAmount Decimal        @db.Decimal(10, 2) @default(30.00)
+  stripePayout String?
+  acceptedAt   DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  survey   Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  operator User?  @relation("OperatorJobs", fields: [operatorId], references: [id])
+
+  @@index([status])
+  @@index([postcode])
+  @@index([operatorId])
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  rooferId           String             @unique
+  plan               SubscriptionPlan
+  status             SubscriptionStatus @default(active)
+  stripeSubId        String             @unique
+  stripeCustomerId   String
+  leadCount          Int                @default(0)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  roofer User @relation(fields: [rooferId], references: [id], onDelete: Cascade)
+
+  @@index([stripeSubId])
+  @@index([status])
+}

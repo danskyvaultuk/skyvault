@@ -36,6 +36,15 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Terraform — state is in S3, local files shouldn't be committed
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfvars
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env
+.env.local
