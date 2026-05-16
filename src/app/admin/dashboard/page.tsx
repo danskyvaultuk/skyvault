@@ -60,11 +60,11 @@ export default async function AdminDashboard() {
   ];
 
   return (
-    <div className="p-8 max-w-5xl">
+    <div className="p-4 md:p-8 max-w-5xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-10">
         {stats.map(({ label, value, sub, href }) => (
           <Link
             key={label}

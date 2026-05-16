@@ -43,7 +43,7 @@ export default async function CustomerDashboard() {
   const isNewUser = properties.length === 0;
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 md:p-8 max-w-3xl">
       {/* Header */}
       <h1 className="text-2xl font-bold text-gray-900 mb-1">
         {firstName ? `Welcome back, ${firstName}` : "Welcome to SkyVault"}
@@ -180,7 +180,7 @@ export default async function CustomerDashboard() {
 
       {/* Summary stats — only when there's data */}
       {completedSurveys.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
           <div className="bg-white border rounded-xl px-5 py-4 text-center">
             <p className="text-2xl font-bold text-gray-900">{properties.length}</p>
             <p className="text-xs text-gray-500 mt-0.5">Properties</p>
