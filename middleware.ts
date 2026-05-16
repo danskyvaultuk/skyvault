@@ -22,38 +22,43 @@ function getDashboard(role: string): string {
 }
 
 export default auth((req) => {
-  const { pathname } = req.nextUrl;
-  const session = req.auth;
+  try {
+    const { pathname } = req.nextUrl;
+    const session = req.auth;
 
-  const isPublic =
-    pathname === "/" ||
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/verify") ||
-    pathname.startsWith("/api/auth");
+    const isPublic =
+      pathname === "/" ||
+      pathname.startsWith("/login") ||
+      pathname.startsWith("/register") ||
+      pathname.startsWith("/verify") ||
+      pathname.startsWith("/api/auth");
 
-  if (isPublic) return NextResponse.next();
+    if (isPublic) return NextResponse.next();
 
-  if (!session) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
 
-  const role = session.user.role as string;
+    const role = session.user.role as string;
 
-  for (const [prefix, requiredRole] of Object.entries(ROLE_PREFIXES)) {
-    if (pathname.startsWith(prefix)) {
-      if (role !== requiredRole && role !== "admin") {
-        return NextResponse.redirect(new URL(getDashboard(role), req.url));
+    for (const [prefix, requiredRole] of Object.entries(ROLE_PREFIXES)) {
+      if (pathname.startsWith(prefix)) {
+        if (role !== requiredRole && role !== "admin") {
+          return NextResponse.redirect(new URL(getDashboard(role), req.url));
+        }
       }
     }
-  }
 
-  const isCustomerPath = CUSTOMER_PATHS.some((p) => pathname.startsWith(p));
-  if (isCustomerPath && role !== "customer" && role !== "admin") {
-    return NextResponse.redirect(new URL(getDashboard(role), req.url));
-  }
+    const isCustomerPath = CUSTOMER_PATHS.some((p) => pathname.startsWith(p));
+    if (isCustomerPath && role !== "customer" && role !== "admin") {
+      return NextResponse.redirect(new URL(getDashboard(role), req.url));
+    }
 
-  return NextResponse.next();
+    return NextResponse.next();
+  } catch (err) {
+    console.error("[middleware] error:", err);
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
 });
 
 export const config = {
