@@ -1,13 +1,25 @@
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import type { AdapterUser } from "next-auth/adapters";
 import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
 
+const baseAdapter = PrismaAdapter(prisma);
+const restrictedAdapter = {
+  ...baseAdapter,
+  createUser: async (user: AdapterUser) => {
+    if (!user.email?.endsWith("@skyvaultuk.com")) {
+      throw new Error("Email domain not allowed");
+    }
+    return baseAdapter.createUser!(user);
+  },
+};
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  adapter: restrictedAdapter,
   providers: [
     // ── DEV ONLY: sign in with just an email (no password, no external service)
     // Remove this provider before going to production
