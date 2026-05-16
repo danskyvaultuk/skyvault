@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16          # Use the official Postgres 16 image from Docker Hub
+    container_name: skyvault-db
+    restart: unless-stopped     # Auto-restart if it crashes, but not if you manually stop it
+    environment:
+      POSTGRES_USER: skyvault
+      POSTGRES_PASSWORD: skyvault
+      POSTGRES_DB: skyvault
+    ports:
+      - "5432:5432"             # Expose port 5432 on your Mac so your app can connect
+    volumes:
+      - skyvault-db-data:/var/lib/postgresql/data   # Persist data between restarts
+
+volumes:
+  skyvault-db-data:             # Named volume — Docker manages this on your Mac
