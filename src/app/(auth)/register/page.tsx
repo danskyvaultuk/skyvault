@@ -2,7 +2,7 @@
 
 import { signIn } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 const ROLES = [
@@ -29,7 +29,6 @@ const ROLES = [
 type Role = (typeof ROLES)[number]["id"];
 
 function RegisterForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedRole = (searchParams.get("role") as Role) ?? "customer";
 
@@ -38,6 +37,7 @@ function RegisterForm() {
   const [role, setRole] = useState<Role>(preselectedRole);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [registered, setRegistered] = useState(false);
 
   useEffect(() => {
     const r = searchParams.get("role") as Role;
@@ -63,19 +63,37 @@ function RegisterForm() {
       return;
     }
 
-    // Log them straight in using the dev-login provider
-    const result = await signIn("dev-login", { email, redirect: false });
+    // Send a magic link to verify their email before letting them in
+    const callbackUrl = role === "roofer" ? "/roofer/dashboard"
+      : role === "drone" ? "/drone/dashboard"
+      : "/dashboard";
+
+    const result = await signIn("resend", { email, redirect: false, callbackUrl });
 
     if (result?.error) {
-      setError("Account created but sign-in failed. Try signing in manually.");
+      setError("Account created but we couldn't send the sign-in email. Try signing in from the login page.");
       setLoading(false);
       return;
     }
 
-    // Redirect to the right portal
-    if (role === "roofer") router.push("/roofer/dashboard");
-    else if (role === "drone") router.push("/drone/dashboard");
-    else router.push("/dashboard");
+    setRegistered(true);
+  }
+
+  if (registered) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border p-8 text-center">
+          <p className="text-4xl mb-4">📬</p>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Check your email</h1>
+          <p className="text-gray-500 text-sm mb-1">We sent a sign-in link to</p>
+          <p className="font-semibold text-gray-900 mb-4">{email}</p>
+          <p className="text-gray-500 text-sm">Click the link in the email to activate your account and get started.</p>
+          <Link href="/login" className="mt-6 inline-block text-sm text-blue-600 hover:underline">
+            Back to sign in
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
