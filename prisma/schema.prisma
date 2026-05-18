@@ -78,11 +78,12 @@ enum SubscriptionStatus {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  image     String?
-  role      Role     @default(customer)
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  role          Role      @default(customer)
   company   String?
   postcode  String?
   phone     String?
