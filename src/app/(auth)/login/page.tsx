@@ -1,34 +1,16 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { signIn, getSession, useSession } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { signIn, getSession } from "next-auth/react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-function getDashboard(role?: string): string {
-  switch (role) {
-    case "roofer": return "/roofer/dashboard";
-    case "drone":  return "/drone/dashboard";
-    case "admin":  return "/admin/dashboard";
-    default:       return "/dashboard";
-  }
-}
-
 export default function LoginPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
-
-  useEffect(() => {
-    if (status === "authenticated") {
-      router.replace(getDashboard(session?.user?.role));
-    }
-  }, [status, session, router]);
 
   async function handleMagicLink(e: React.FormEvent) {
     e.preventDefault();
