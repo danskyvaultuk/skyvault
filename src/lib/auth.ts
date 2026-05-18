@@ -58,7 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
     Resend({
       apiKey: process.env.AUTH_RESEND_KEY ?? "",
-      from: process.env.RESEND_FROM_EMAIL ?? "noreply@skyvault.co.uk",
+      from: process.env.RESEND_FROM_EMAIL ?? "noreply@skyvaultuk.com",
     }),
   ],
   session: {
