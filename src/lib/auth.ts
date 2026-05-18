@@ -51,11 +51,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
 
-    // ── PRODUCTION providers (add credentials before deploying) ──
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID ?? "",
-      clientSecret: process.env.AUTH_GOOGLE_SECRET ?? "",
-    }),
+    // ── PRODUCTION providers ──
+    ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET ? [
+      Google({
+        clientId: process.env.AUTH_GOOGLE_ID,
+        clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      }),
+    ] : []),
     Resend({
       apiKey: process.env.AUTH_RESEND_KEY ?? "",
       from: process.env.RESEND_FROM_EMAIL ?? "noreply@skyvaultuk.com",
