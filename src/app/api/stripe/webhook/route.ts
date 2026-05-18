@@ -89,7 +89,8 @@ export async function POST(req: NextRequest) {
 
     case "invoice.payment_failed": {
       const invoice = event.data.object as Stripe.Invoice;
-      const subId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+      const subRef = invoice.parent?.subscription_details?.subscription;
+      const subId = typeof subRef === "string" ? subRef : subRef?.id;
       if (subId) {
         await prisma.subscription.updateMany({
           where: { stripeSubId: subId },
