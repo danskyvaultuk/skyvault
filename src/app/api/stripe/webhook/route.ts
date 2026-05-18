@@ -15,7 +15,8 @@ async function upsertSubscription(sub: Stripe.Subscription) {
   const userId = sub.metadata?.userId;
   if (!userId) return;
 
-  const priceId = sub.items.data[0]?.price.id;
+  const item = sub.items.data[0];
+  const priceId = item?.price.id;
   const plan = planFromPriceId(priceId);
   if (!plan) return;
 
@@ -28,6 +29,10 @@ async function upsertSubscription(sub: Stripe.Subscription) {
   };
   const status = statusMap[sub.status] ?? "past_due";
 
+  // current_period_start/end moved to the subscription item in API v2026-04-22.dahlia
+  const periodStart = new Date((item?.current_period_start ?? sub.billing_cycle_anchor) * 1000);
+  const periodEnd = new Date((item?.current_period_end ?? sub.billing_cycle_anchor) * 1000);
+
   await prisma.subscription.upsert({
     where: { rooferId: userId },
     create: {
@@ -36,16 +41,16 @@ async function upsertSubscription(sub: Stripe.Subscription) {
       status,
       stripeSubId: sub.id,
       stripeCustomerId: sub.customer as string,
-      currentPeriodStart: new Date(sub.current_period_start * 1000),
-      currentPeriodEnd: new Date(sub.current_period_end * 1000),
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
     },
     update: {
       plan,
       status,
       stripeSubId: sub.id,
-      currentPeriodStart: new Date(sub.current_period_start * 1000),
-      currentPeriodEnd: new Date(sub.current_period_end * 1000),
+      currentPeriodStart: periodStart,
+      currentPeriodEnd: periodEnd,
       cancelAtPeriodEnd: sub.cancel_at_period_end,
     },
   });
