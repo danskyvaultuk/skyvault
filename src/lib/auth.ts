@@ -12,6 +12,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       Google({
         clientId: process.env.AUTH_GOOGLE_ID,
         clientSecret: process.env.AUTH_GOOGLE_SECRET,
+        allowDangerousEmailAccountLinking: true,
       }),
     ] : []),
     Resend({
@@ -34,10 +35,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async jwt({ token, user }) {
-      // On first sign-in, `user` is populated — copy id and role into the token
       if (user) {
         token.id = user.id;
         token.role = (user as { role: Role }).role;
+      }
+      // OAuth providers don't pass custom fields — fetch role from DB if missing
+      if (!token.role && token.id) {
+        const dbUser = await prisma.user.findUnique({ where: { id: token.id as string } });
+        if (dbUser) token.role = dbUser.role;
       }
       return token;
     },
