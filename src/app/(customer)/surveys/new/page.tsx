@@ -17,15 +17,16 @@ export default function NewSurveyPage() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
 
-  // Load the customer's properties so they can pick one
   useEffect(() => {
     fetch("/api/properties")
       .then((r) => r.json())
       .then((data) => {
         setProperties(data);
         if (data.length > 0) setPropertyId(data[0].id);
-      });
+      })
+      .finally(() => setReady(true));
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -47,9 +48,10 @@ export default function NewSurveyPage() {
     }
 
     const survey = await res.json();
-    // Redirect to the upload page for this new survey
     router.push(`/surveys/${survey.id}`);
   }
+
+  if (!ready) return null;
 
   return (
     <div className="p-8 max-w-xl">
@@ -79,11 +81,8 @@ export default function NewSurveyPage() {
             </p>
           )}
 
-          {/* Property picker */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Property
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Property</label>
             <select
               value={propertyId}
               onChange={(e) => setPropertyId(e.target.value)}
@@ -97,44 +96,31 @@ export default function NewSurveyPage() {
             </select>
           </div>
 
-          {/* Survey type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Survey type
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Survey type</label>
             <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setType("self_upload")}
-                className={`border rounded-xl p-4 text-left transition ${
-                  type === "self_upload"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <p className="font-medium text-gray-900">Self upload</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Upload your own photos from a phone or drone
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => setType("drone_capture")}
-                className={`border rounded-xl p-4 text-left transition ${
-                  type === "drone_capture"
-                    ? "border-blue-600 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                <p className="font-medium text-gray-900">Drone capture</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  We send a local operator to capture the images
-                </p>
-              </button>
+              {(["self_upload", "drone_capture"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setType(t)}
+                  className={`border rounded-xl p-4 text-left transition ${
+                    type === t ? "border-blue-600 bg-blue-50" : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <p className="font-medium text-gray-900">
+                    {t === "self_upload" ? "Self upload" : "Drone capture"}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {t === "self_upload"
+                      ? "Upload your own photos from a phone or drone"
+                      : "We send a local operator to capture the images"}
+                  </p>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Optional notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Notes <span className="text-gray-400 font-normal">(optional)</span>

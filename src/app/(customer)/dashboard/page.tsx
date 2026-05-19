@@ -118,9 +118,7 @@ export default async function CustomerDashboard() {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Recent surveys</h2>
-            {recentSurveys.length >= 5 && (
-              <Link href="/surveys" className="text-sm text-blue-600 hover:underline">View all →</Link>
-            )}
+            <Link href="/surveys" className="text-sm text-blue-600 hover:underline">View all →</Link>
           </div>
           <div className="space-y-3">
             {recentSurveys.map((survey) => {
