@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { RoleChanger } from "./role-changer";
+import { DeleteButton } from "./delete-button";
 
 const ROLE_COLOURS: Record<string, string> = {
   admin:    "bg-purple-100 text-purple-700",
@@ -30,6 +31,7 @@ export default async function AdminUsersPage() {
               <th className="text-left px-5 py-3 font-medium text-gray-600">Surveys</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Joined</th>
               <th className="px-5 py-3 font-medium text-gray-600">Change role</th>
+              <th className="px-5 py-3 font-medium text-gray-600"></th>
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -51,6 +53,9 @@ export default async function AdminUsersPage() {
                 </td>
                 <td className="px-5 py-3">
                   <RoleChanger userId={u.id} currentRole={u.role} />
+                </td>
+                <td className="px-5 py-3">
+                  <DeleteButton userId={u.id} userName={u.name ?? u.email} />
                 </td>
               </tr>
             ))}
