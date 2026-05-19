@@ -3,7 +3,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SubscribeButton } from "./subscribe-button";
 import { ManageButton } from "./manage-button";
-import { ActivateDevSubscription } from "./activate-dev";
 import { SuccessBanner } from "./success-banner";
 
 const PLANS = [
@@ -130,15 +129,6 @@ export default async function SubscriptionPage() {
         })}
       </div>
 
-      {/* Dev activation (hidden in production) */}
-      {process.env.NODE_ENV !== "production" && (
-        <details className="mt-4">
-          <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Dev tools</summary>
-          <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
-            <ActivateDevSubscription currentPlan={subscription?.plan ?? null} isActive={isActive} />
-          </div>
-        </details>
-      )}
     </div>
   );
 }

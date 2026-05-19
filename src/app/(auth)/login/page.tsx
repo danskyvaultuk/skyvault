@@ -1,12 +1,10 @@
 "use client";
 
-import { signIn, getSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,28 +26,7 @@ export default function LoginPage() {
     setLoading(false);
   }
 
-  async function handleDevLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    const result = await signIn("dev-login", { email, redirect: false });
-
-    if (result?.error) {
-      setError("No account found for that email.");
-    } else {
-      const session = await getSession();
-      const role = session?.user?.role;
-      if (role === "drone")       router.push("/drone/dashboard");
-      else if (role === "roofer") router.push("/roofer/dashboard");
-      else if (role === "admin")  router.push("/admin/dashboard");
-      else                        router.push("/dashboard");
-    }
-
-    setLoading(false);
-  }
-
-  return (
+return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border p-8">
 
@@ -120,29 +97,6 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* DEV LOGIN */}
-            <details className="mt-6 pt-6 border-t">
-              <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
-                Dev login
-              </summary>
-              <form onSubmit={handleDevLogin} className="mt-3 space-y-3">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  placeholder="existing@skyvaultuk.com"
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
-                >
-                  {loading ? "Signing in…" : "Sign in without password"}
-                </button>
-              </form>
-            </details>
 
             <div className="mt-6 pt-6 border-t text-center">
               <p className="text-sm text-gray-500 mb-3">Don&apos;t have an account?</p>
