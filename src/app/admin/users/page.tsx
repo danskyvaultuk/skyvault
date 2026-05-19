@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { RoleChanger } from "./role-changer";
 import { DeleteButton } from "./delete-button";
+import { ImpersonateButton } from "./impersonate-button";
 
 const ROLE_COLOURS: Record<string, string> = {
   admin:    "bg-purple-100 text-purple-700",
@@ -53,6 +54,9 @@ export default async function AdminUsersPage() {
                 </td>
                 <td className="px-5 py-3">
                   <RoleChanger userId={u.id} currentRole={u.role} />
+                </td>
+                <td className="px-5 py-3">
+                  <ImpersonateButton userId={u.id} />
                 </td>
                 <td className="px-5 py-3">
                   <DeleteButton userId={u.id} userName={u.name ?? u.email} />
