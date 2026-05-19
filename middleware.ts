@@ -30,7 +30,8 @@ export default auth((req) => {
     pathname.startsWith("/register") ||
     pathname.startsWith("/verify") ||
     pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/stripe/webhook");
+    pathname.startsWith("/api/stripe/webhook") ||
+    pathname.startsWith("/auth/redirect");
 
   if (isPublic) return NextResponse.next();
 
