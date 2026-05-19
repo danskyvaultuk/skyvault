@@ -29,3 +29,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const user = await prisma.user.update({ where: { id }, data });
   return NextResponse.json(user);
 }
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await params;
+
+  // Prevent admins from deleting themselves
+  if (id === session.user.id) {
+    return NextResponse.json({ error: "Cannot delete your own account" }, { status: 400 });
+  }
+
+  await prisma.user.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}
