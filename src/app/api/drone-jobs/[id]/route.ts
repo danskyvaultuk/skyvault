@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { runAnalysisPipeline } from "@/lib/pipeline";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -83,11 +84,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data: { status: "images_uploaded", completedAt: new Date() },
     });
 
-    // Also update the survey status so the customer knows images are ready
-    await prisma.survey.update({
-      where: { id: job.surveyId },
-      data: { status: "pending" },
-    });
+    // Automatically kick off the AI analysis pipeline — don't await it so the
+    // operator gets an instant response. The pipeline runs in the background and
+    // will set survey.status → "analysing" → "complete" (or "failed") itself.
+    runAnalysisPipeline(job.surveyId).catch((err) =>
+      console.error(`[drone-jobs] Auto-analysis failed for survey ${job.surveyId}:`, err)
+    );
 
     return NextResponse.json(updated);
   }
