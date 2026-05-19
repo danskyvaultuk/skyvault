@@ -39,12 +39,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const session = await auth();
   if (!session) redirect("/login");
 
-  // Load survey + report + property together
+  // Load survey + report + property + images together
   const survey = await prisma.survey.findUnique({
     where: { id: surveyId },
     include: {
       property: true,
       report: true,
+      images: { orderBy: { sortOrder: "asc" } },
     },
   });
 
@@ -59,6 +60,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     type: string; severity: string; description: string; image_index: number;
   }>);
   const recommendations = report.recommendations as string[];
+
+  // Generate presigned URLs for all survey images (valid 1 hour)
+  const imageUrls = await Promise.all(
+    survey.images.map((img) => getPresignedReadUrl(img.s3Key, 3600))
+  );
 
   // Generate a presigned URL for the PDF download (valid 1 hour)
   const pdfUrl = report.pdfS3Key
@@ -121,6 +127,33 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
+      {/* Photo gallery */}
+      {imageUrls.length > 0 && (
+        <div className="bg-white border rounded-xl mb-6 overflow-hidden">
+          <div className="px-5 py-4 border-b">
+            <h2 className="font-semibold text-gray-900">Survey photos ({imageUrls.length})</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4">
+            {imageUrls.map((url, i) => (
+              <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="relative group block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`Survey image ${i + 1}`}
+                  className="w-full aspect-square object-cover rounded-lg border group-hover:opacity-90 transition"
+                />
+                <span className="absolute bottom-1.5 left-1.5 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded">
+                  {i + 1}
+                </span>
+              </a>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400 px-5 pb-4">
+            Image numbers match the references in the defects section below. Click to view full size.
+          </p>
+        </div>
+      )}
+
       {/* Defects */}
       {defects && defects.length > 0 && (
         <div className="bg-white border rounded-xl mb-6 overflow-hidden">
@@ -133,10 +166,15 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-0.5 ${SEVERITY_STYLES[d.severity] ?? SEVERITY_STYLES.low}`}>
                   {d.severity}
                 </span>
-                <div>
-                  <p className="text-sm font-medium text-gray-900 capitalize">
-                    {d.type.replace(/_/g, " ")}
-                  </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-gray-900 capitalize">
+                      {d.type.replace(/_/g, " ")}
+                    </p>
+                    {imageUrls[d.image_index] && (
+                      <span className="text-xs text-gray-400">photo {d.image_index + 1}</span>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500 mt-0.5">{d.description}</p>
                 </div>
               </div>
