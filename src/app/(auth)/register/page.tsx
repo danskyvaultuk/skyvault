@@ -64,9 +64,7 @@ function RegisterForm() {
     }
 
     // Send a magic link to verify their email before letting them in
-    const callbackUrl = role === "roofer" ? "/roofer/dashboard"
-      : role === "drone" ? "/drone/dashboard"
-      : "/dashboard";
+    const callbackUrl = "/auth/redirect";
 
     const result = await signIn("resend", { email, redirect: false, callbackUrl });
 

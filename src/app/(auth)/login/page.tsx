@@ -17,7 +17,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const result = await signIn("resend", { email, redirect: false, callbackUrl: "/dashboard" });
+    const result = await signIn("resend", { email, redirect: false, callbackUrl: "/auth/redirect" });
 
     if (result?.error) {
       setError("Could not send magic link. Please try again.");
@@ -106,7 +106,7 @@ export default function LoginPage() {
             {/* GOOGLE */}
             <div className="mt-4">
               <button
-                onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+                onClick={() => signIn("google", { callbackUrl: "/auth/redirect" })}
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
