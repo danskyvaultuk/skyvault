@@ -54,16 +54,5 @@ export async function POST(req: Request) {
     },
   });
 
-  // If drone capture — automatically post a DroneJob so operators can see it
-  if (parsed.data.type === "drone_capture") {
-    await prisma.droneJob.create({
-      data: {
-        surveyId: survey.id,
-        postcode: property.postcode,
-        status: "posted",
-      },
-    });
-  }
-
   return NextResponse.json(survey, { status: 201 });
 }
