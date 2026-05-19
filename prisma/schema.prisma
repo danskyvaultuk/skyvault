@@ -248,7 +248,7 @@ model LeadClaim {
   updatedAt   DateTime        @updatedAt
 
   lead   Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  roofer User @relation(fields: [rooferId], references: [id])
+  roofer User @relation(fields: [rooferId], references: [id], onDelete: Cascade)
 
   @@unique([leadId, rooferId])
   @@index([rooferId])
