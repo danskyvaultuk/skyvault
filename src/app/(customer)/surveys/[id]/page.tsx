@@ -48,6 +48,8 @@ export default function SurveyPage() {
   const [imageCount, setImageCount] = useState(0);
   const [analysing, setAnalysing] = useState(false);
   const [error, setError] = useState("");
+  const [notes, setNotes] = useState("");
+  const [notesSaved, setNotesSaved] = useState(false);
 
   useEffect(() => {
     fetch(`/api/surveys/${id}`)
@@ -55,11 +57,22 @@ export default function SurveyPage() {
       .then((data) => {
         setSurvey(data);
         setImageCount(data.images?.length ?? 0);
+        setNotes(data.notes ?? "");
       });
   }, [id]);
 
   function handleUploadComplete(count: number) {
     setImageCount((prev) => prev + count);
+  }
+
+  async function saveNotes() {
+    await fetch(`/api/surveys/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes }),
+    });
+    setNotesSaved(true);
+    setTimeout(() => setNotesSaved(false), 2000);
   }
 
   async function handleRetry() {
@@ -107,12 +120,22 @@ export default function SurveyPage() {
         <h1 className="text-2xl font-bold text-gray-900">{survey.property.address}</h1>
         <p className="text-gray-500">{survey.property.postcode}</p>
         <div className="mt-3 flex items-center gap-3">
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusInfo.colour}`}>
-            {statusInfo.label}
-          </span>
-          <span className="text-sm text-gray-400">
-            {isDrone ? "Drone capture" : "Self upload"}
-          </span>
+          {/* Hide the draft label for self-upload — the upload form makes the state obvious */}
+          {(!isDrone && survey.status !== "draft") && (
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusInfo.colour}`}>
+              {statusInfo.label}
+            </span>
+          )}
+          {(isDrone || survey.status !== "draft") && (
+            <span className="text-sm text-gray-400">
+              {isDrone ? "Drone capture" : "Self upload"}
+            </span>
+          )}
+          {isDrone && (
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusInfo.colour}`}>
+              {statusInfo.label}
+            </span>
+          )}
         </div>
       </div>
 
@@ -200,6 +223,30 @@ export default function SurveyPage() {
                 areas you&apos;re concerned about.
               </p>
               <ImageUploader surveyId={id} onUploadComplete={handleUploadComplete} />
+            </div>
+          )}
+
+          {/* Customer concerns — saved to notes, passed to Claude at analysis time */}
+          {survey.status === "draft" && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-medium text-gray-700">
+                  Any concerns or areas to focus on?
+                </label>
+                {notesSaved && (
+                  <span className="text-xs text-green-600">Saved</span>
+                )}
+              </div>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={saveNotes}
+                rows={3}
+                maxLength={500}
+                placeholder="e.g. Crack on the left chimney, missing tiles at the front, damp patch in the back bedroom…"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+              <p className="text-xs text-gray-400 mt-1">{notes.length}/500 — saved automatically. This is sent to the AI alongside your images.</p>
             </div>
           )}
 
