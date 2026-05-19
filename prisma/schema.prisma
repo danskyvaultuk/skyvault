@@ -168,7 +168,7 @@ model Survey {
   updatedAt  DateTime     @updatedAt
 
   property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  customer User      @relation("CustomerSurveys", fields: [customerId], references: [id])
+  customer User      @relation("CustomerSurveys", fields: [customerId], references: [id], onDelete: Cascade)
   images   Image[]
   report   Report?
   droneJob DroneJob?
@@ -193,7 +193,7 @@ model Image {
   createdAt        DateTime              @default(now())
 
   survey     Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  uploadedBy User   @relation(fields: [uploadedById], references: [id])
+  uploadedBy User   @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
 
   @@index([surveyId])
 }
@@ -268,7 +268,7 @@ model DroneJob {
   updatedAt    DateTime       @updatedAt
 
   survey   Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  operator User?  @relation("OperatorJobs", fields: [operatorId], references: [id])
+  operator User?  @relation("OperatorJobs", fields: [operatorId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([postcode])
