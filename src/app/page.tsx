@@ -5,7 +5,7 @@ export default function LandingPage() {
     <main className="flex flex-col min-h-screen">
       {/* Nav */}
       <nav className="border-b bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-        <span className="text-xl font-bold text-blue-700">SkyVault</span>
+        <span className="text-xl font-bold text-blue-700">SkyVault ✦ Preview</span>
         <div className="flex gap-4 items-center">
           <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">
             Sign in
