@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 import { MobileNav } from "@/components/mobile-nav";
 
 const nav = [
@@ -12,11 +10,6 @@ const nav = [
 export default async function DroneLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session) redirect("/login");
-
-  const users = await prisma.user.findMany({
-    select: { id: true, email: true, name: true, role: true },
-    orderBy: { role: "asc" },
-  });
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -37,10 +30,7 @@ export default async function DroneLayout({ children }: { children: React.ReactN
           </nav>
         </aside>
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="bg-white border-b px-4 md:px-6 py-3 flex items-center justify-end gap-2 md:gap-4">
-            <div className="hidden md:block">
-              <DevRoleSwitcher users={users} currentEmail={session.user?.email ?? ""} />
-            </div>
+          <header className="bg-white border-b px-4 md:px-6 py-3 flex items-center justify-end gap-4">
             <p className="text-sm text-gray-500 hidden sm:block truncate max-w-[180px]">{session.user?.email}</p>
             <Link href="/api/auth/signout"
               className="text-sm font-medium text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg whitespace-nowrap">
