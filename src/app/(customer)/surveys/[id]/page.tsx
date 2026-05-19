@@ -1,41 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ImageUploader } from "@/components/surveys/image-uploader";
+import { DroneBookingPanel } from "./drone-booking";
+
+interface DroneJob {
+  id: string;
+  scheduledAt: string | null;
+  status: string;
+}
 
 interface Survey {
   id: string;
   status: string;
   type: string;
   notes?: string;
-  property: {
-    address: string;
-    postcode: string;
-  };
+  property: { address: string; postcode: string };
   images: { id: string }[];
+  droneJob: DroneJob | null;
 }
 
 const STATUS_LABELS: Record<string, Record<string, { label: string; colour: string }>> = {
   self_upload: {
-    draft:      { label: "Draft — upload images to continue",  colour: "bg-gray-100 text-gray-700" },
-    pending:    { label: "Pending analysis",                   colour: "bg-amber-100 text-amber-700" },
-    analysing:  { label: "Analysing with AI…",                 colour: "bg-blue-100 text-blue-700" },
-    complete:   { label: "Report ready",                       colour: "bg-green-100 text-green-700" },
-    failed:     { label: "Analysis failed — please retry",     colour: "bg-red-100 text-red-700" },
+    draft:     { label: "Draft — upload images to continue", colour: "bg-gray-100 text-gray-700" },
+    pending:   { label: "Pending analysis",                  colour: "bg-amber-100 text-amber-700" },
+    analysing: { label: "Analysing with AI…",                colour: "bg-blue-100 text-blue-700" },
+    complete:  { label: "Report ready",                      colour: "bg-green-100 text-green-700" },
+    failed:    { label: "Analysis failed — please retry",    colour: "bg-red-100 text-red-700" },
   },
   drone_capture: {
-    draft:      { label: "Awaiting drone operator",            colour: "bg-amber-100 text-amber-700" },
-    pending:    { label: "Images ready — analysis due",        colour: "bg-blue-100 text-blue-700" },
-    analysing:  { label: "Analysing with AI…",                 colour: "bg-blue-100 text-blue-700" },
-    complete:   { label: "Report ready",                       colour: "bg-green-100 text-green-700" },
-    failed:     { label: "Analysis failed",                    colour: "bg-red-100 text-red-700" },
+    draft:     { label: "Awaiting drone operator",           colour: "bg-amber-100 text-amber-700" },
+    pending:   { label: "Images ready — analysis due",       colour: "bg-blue-100 text-blue-700" },
+    analysing: { label: "Analysing with AI…",                colour: "bg-blue-100 text-blue-700" },
+    complete:  { label: "Report ready",                      colour: "bg-green-100 text-green-700" },
+    failed:    { label: "Analysis failed",                   colour: "bg-red-100 text-red-700" },
   },
 };
 
 export default function SurveyPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const justBooked = searchParams.get("booked") === "1";
+
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [imageCount, setImageCount] = useState(0);
   const [analysing, setAnalysing] = useState(false);
@@ -50,13 +58,11 @@ export default function SurveyPage() {
       });
   }, [id]);
 
-  // Called by ImageUploader each time an upload batch finishes
   function handleUploadComplete(count: number) {
     setImageCount((prev) => prev + count);
   }
 
   async function handleRetry() {
-    // Reset status to draft via PATCH, then re-analyse
     await fetch(`/api/surveys/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -69,17 +75,13 @@ export default function SurveyPage() {
   async function handleAnalyse() {
     setAnalysing(true);
     setError("");
-
     const res = await fetch(`/api/surveys/${id}/analyse`, { method: "POST" });
-
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       setError(body.error ?? "Analysis failed. Please try again.");
       setAnalysing(false);
       return;
     }
-
-    const { reportId } = await res.json();
     router.push(`/surveys/${id}/report`);
   }
 
@@ -96,6 +98,7 @@ export default function SurveyPage() {
   const typeLabels = STATUS_LABELS[survey.type] ?? STATUS_LABELS.self_upload;
   const statusInfo = typeLabels[survey.status] ?? typeLabels.draft;
   const canAnalyse = imageCount >= 1 && (survey.status === "draft" || survey.status === "pending");
+  const droneBooked = justBooked || !!survey.droneJob;
 
   return (
     <div className="p-8 max-w-2xl">
@@ -113,21 +116,37 @@ export default function SurveyPage() {
         </div>
       </div>
 
-      {/* ── DRONE CAPTURE FLOW ─────────────────────────────────────────────────── */}
+      {/* ── DRONE CAPTURE FLOW ─────────────────────────────────────────── */}
       {isDrone && (
         <>
-          {(survey.status === "draft") && (
+          {survey.status === "draft" && !droneBooked && (
+            <DroneBookingPanel surveyId={survey.id} />
+          )}
+
+          {survey.status === "draft" && droneBooked && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-6 py-5 mb-6">
               <div className="flex items-start gap-4">
                 <span className="text-3xl">🚁</span>
                 <div>
-                  <p className="font-semibold text-blue-900 mb-1">A drone operator will be in touch</p>
+                  <p className="font-semibold text-blue-900 mb-1">Booking confirmed!</p>
+                  {survey.droneJob?.scheduledAt && (
+                    <p className="text-sm text-blue-700 font-medium mb-2">
+                      Preferred slot:{" "}
+                      {new Date(survey.droneJob.scheduledAt).toLocaleString("en-GB", {
+                        weekday: "long",
+                        day: "numeric",
+                        month: "long",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
                   <p className="text-sm text-blue-700">
-                    Your job has been posted to our network of drone operators. One will accept the job,
-                    fly out to your property, and upload high-quality aerial images directly to your survey.
+                    A drone operator will accept your job and be in touch to confirm the visit.
+                    High-quality aerial images will be uploaded directly to your survey.
                   </p>
                   <p className="text-sm text-blue-600 mt-3 font-medium">
-                    You&apos;ll be notified by email once the images are ready and your report has been generated. There&apos;s nothing more you need to do.
+                    You&apos;ll be notified by email once the images are ready and your report has been generated.
                   </p>
                 </div>
               </div>
@@ -139,7 +158,7 @@ export default function SurveyPage() {
               <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-4">
                 <p className="text-green-700 font-semibold text-sm">Drone images ready</p>
                 <p className="text-green-600 text-sm mt-1">
-                  Your drone operator has completed the capture and uploaded the images. Run the AI analysis to get your report.
+                  Your drone operator has completed the capture. Run the AI analysis to get your report.
                 </p>
               </div>
               {error && (
@@ -159,10 +178,9 @@ export default function SurveyPage() {
         </>
       )}
 
-      {/* ── SELF UPLOAD FLOW ───────────────────────────────────────────────────── */}
+      {/* ── SELF UPLOAD FLOW ───────────────────────────────────────────── */}
       {!isDrone && (
         <>
-          {/* Image count */}
           <div className="bg-white border rounded-xl px-5 py-4 mb-6 flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Images uploaded</p>
@@ -174,7 +192,6 @@ export default function SurveyPage() {
             </div>
           </div>
 
-          {/* Uploader — only in draft */}
           {survey.status === "draft" && (
             <div className="mb-6">
               <h2 className="text-base font-semibold text-gray-900 mb-3">Upload roof images</h2>
@@ -186,14 +203,12 @@ export default function SurveyPage() {
             </div>
           )}
 
-          {/* Error message */}
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-4">
               {error}
             </p>
           )}
 
-          {/* Analyse button */}
           {(survey.status === "draft" || survey.status === "pending") && (
             <button
               onClick={handleAnalyse}
@@ -208,7 +223,6 @@ export default function SurveyPage() {
             </button>
           )}
 
-          {/* Retry */}
           {survey.status === "failed" && (
             <button
               onClick={handleRetry}
@@ -220,11 +234,13 @@ export default function SurveyPage() {
         </>
       )}
 
-      {/* ── SHARED: report ready ───────────────────────────────────────────────── */}
+      {/* ── SHARED ─────────────────────────────────────────────────────── */}
       {survey.status === "analysing" && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4">
           <p className="text-blue-700 font-semibold text-sm">Analysing your roof…</p>
-          <p className="text-blue-600 text-sm mt-1">This usually takes about 30 seconds. You can leave this page and come back.</p>
+          <p className="text-blue-600 text-sm mt-1">
+            This usually takes about 30 seconds. You can leave this page and come back.
+          </p>
         </div>
       )}
 
@@ -237,7 +253,6 @@ export default function SurveyPage() {
         </a>
       )}
 
-      {/* Notes */}
       {survey.notes && (
         <div className="mt-6 bg-gray-50 border rounded-xl px-5 py-4">
           <p className="text-sm font-medium text-gray-700 mb-1">Notes</p>

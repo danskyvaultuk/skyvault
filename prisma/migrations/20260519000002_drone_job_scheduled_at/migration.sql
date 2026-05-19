@@ -1,0 +1,1 @@
+ALTER TABLE "DroneJob" ADD COLUMN "scheduledAt" TIMESTAMP(3);

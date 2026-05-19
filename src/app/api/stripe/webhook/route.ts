@@ -70,6 +70,21 @@ export async function POST(req: NextRequest) {
   }
 
   switch (event.type) {
+    case "checkout.session.completed": {
+      const cs = event.data.object as Stripe.Checkout.Session;
+      if (cs.metadata?.type === "drone_deposit") {
+        const { surveyId, scheduledAt, postcode } = cs.metadata;
+        await prisma.droneJob.create({
+          data: {
+            surveyId,
+            postcode,
+            scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+          },
+        });
+      }
+      break;
+    }
+
     case "customer.subscription.created":
     case "customer.subscription.updated":
       await upsertSubscription(event.data.object as Stripe.Subscription);
