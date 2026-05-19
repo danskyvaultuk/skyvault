@@ -23,7 +23,7 @@ export default function NewPropertyPage() {
   const [error, setError] = useState("");
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   function handleAddressInput(value: string) {
     setForm((f) => ({ ...f, address: value }));
