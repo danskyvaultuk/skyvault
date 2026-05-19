@@ -97,7 +97,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     console.log("[analyse] Sending images to Claude…");
     const analysis = await analyzeRoof(
       imageData.map((d) => d.base64),
-      imageData.map((d) => d.mimeType)
+      imageData.map((d) => d.mimeType),
+      survey.notes ?? undefined
     );
     console.log(`[analyse] Got score: ${analysis.condition_score}/10`);
 

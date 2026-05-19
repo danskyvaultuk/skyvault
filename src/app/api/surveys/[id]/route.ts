@@ -45,7 +45,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = await req.json();
   // Allow resetting a failed survey back to draft for retry
   const data: { notes?: string; status?: SurveyStatus } = {};
-  if (body.notes !== undefined) data.notes = body.notes;
+  // Allow updating notes freely while the survey is still in draft
+  if (body.notes !== undefined && survey.status === "draft") data.notes = body.notes;
   if (body.status === "draft" && survey.status === "failed") data.status = "draft";
 
   const updated = await prisma.survey.update({
