@@ -107,7 +107,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const pdfBuffer = await renderReportPDF(
       analysis,
       survey.property.address,
-      survey.property.postcode
+      survey.property.postcode,
+      imageData.map((d) => d.base64)
     );
 
     // ── Step 6: Upload PDF to S3 ───────────────────────────────────────────────

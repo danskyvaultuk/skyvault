@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from "@react-pdf/renderer";
 import React from "react";
 import type { RoofAnalysis } from "./claude";
 
@@ -89,11 +89,13 @@ function ReportDocument({
   address,
   postcode,
   generatedAt,
+  imageBase64s,
 }: {
   analysis: RoofAnalysis;
   address: string;
   postcode: string;
   generatedAt: string;
+  imageBase64s?: string[];
 }) {
   return (
     <Document>
@@ -187,6 +189,40 @@ function ReportDocument({
           </Text>
         </View>
       </Page>
+
+      {/* Photo annex — one page per 4 images (2×2 grid) */}
+      {imageBase64s && imageBase64s.length > 0 && (
+        <Page size="A4" style={styles.page}>
+          <View style={styles.header}>
+            <Text style={styles.brand}>SkyVault</Text>
+            <Text style={styles.title}>Survey Photos</Text>
+            <Text style={styles.subtitle}>
+              {address}, {postcode} · {imageBase64s.length} image{imageBase64s.length !== 1 ? "s" : ""}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {imageBase64s.map((b64, i) => (
+              <View key={i} style={{ width: "48%", marginBottom: 8 }}>
+                <Image
+                  src={`data:image/jpeg;base64,${b64}`}
+                  style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 4 }}
+                />
+                <Text style={{ fontSize: 8, color: "#6b7280", marginTop: 3 }}>
+                  Photo {i + 1}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.footer} fixed>
+            <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvault.co.uk</Text>
+            <Text style={styles.footerText}>
+              This report is AI-generated and should be verified by a qualified roofer.
+            </Text>
+          </View>
+        </Page>
+      )}
     </Document>
   );
 }
@@ -195,14 +231,15 @@ function ReportDocument({
 export async function renderReportPDF(
   analysis: RoofAnalysis,
   address: string,
-  postcode: string
+  postcode: string,
+  imageBase64s?: string[]
 ): Promise<Buffer> {
   const generatedAt = new Date().toLocaleDateString("en-GB", {
     day: "numeric", month: "long", year: "numeric",
   });
 
   const element = React.createElement(ReportDocument, {
-    analysis, address, postcode, generatedAt,
+    analysis, address, postcode, generatedAt, imageBase64s,
   }) as unknown as React.ReactElement<import("@react-pdf/renderer").DocumentProps>;
 
   const buffer = await renderToBuffer(element);
