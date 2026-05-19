@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SubscribeButton } from "./subscribe-button";
 import { ManageButton } from "./manage-button";
 import { ActivateDevSubscription } from "./activate-dev";
+import { SuccessBanner } from "./success-banner";
 
 const PLANS = [
   {
@@ -37,6 +39,9 @@ export default async function SubscriptionPage() {
 
   return (
     <div className="p-8 max-w-2xl">
+      <Suspense>
+        <SuccessBanner />
+      </Suspense>
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Subscription</h1>
       <p className="text-gray-500 mb-8">
         Choose a plan to start receiving roof survey leads in your area.
