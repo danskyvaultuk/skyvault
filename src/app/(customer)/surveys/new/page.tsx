@@ -82,7 +82,10 @@ export default function NewSurveyPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Property</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">Property</label>
+              <a href="/properties/new" className="text-xs text-blue-600 hover:underline">+ Add new property</a>
+            </div>
             <select
               value={propertyId}
               onChange={(e) => setPropertyId(e.target.value)}
