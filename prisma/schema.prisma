@@ -262,6 +262,7 @@ model DroneJob {
   postcode     String
   payoutAmount Decimal        @db.Decimal(10, 2) @default(30.00)
   stripePayout String?
+  scheduledAt  DateTime?
   acceptedAt   DateTime?
   completedAt  DateTime?
   createdAt    DateTime       @default(now())
