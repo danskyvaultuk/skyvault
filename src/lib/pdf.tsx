@@ -183,7 +183,7 @@ function ReportDocument({
 
         {/* Footer */}
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvault.co.uk</Text>
+          <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvaultuk.com</Text>
           <Text style={styles.footerText}>
             This report is AI-generated and should be verified by a qualified roofer.
           </Text>
@@ -216,7 +216,7 @@ function ReportDocument({
           </View>
 
           <View style={styles.footer} fixed>
-            <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvault.co.uk</Text>
+            <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvaultuk.com</Text>
             <Text style={styles.footerText}>
               This report is AI-generated and should be verified by a qualified roofer.
             </Text>
