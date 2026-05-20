@@ -2,6 +2,9 @@
   "functions": {
     "src/app/api/surveys/[id]/analyse/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/drone-jobs/[id]/route.ts": {
+      "maxDuration": 60
     }
   }
 }
