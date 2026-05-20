@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { runAnalysisPipeline } from "@/lib/pipeline";
@@ -84,11 +85,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data: { status: "images_uploaded", completedAt: new Date() },
     });
 
-    // Automatically kick off the AI analysis pipeline — don't await it so the
-    // operator gets an instant response. The pipeline runs in the background and
-    // will set survey.status → "analysing" → "complete" (or "failed") itself.
-    runAnalysisPipeline(job.surveyId).catch((err) =>
-      console.error(`[drone-jobs] Auto-analysis failed for survey ${job.surveyId}:`, err)
+    // Automatically kick off the AI analysis pipeline.
+    // waitUntil keeps the Vercel function alive until the pipeline finishes,
+    // even though we've already returned the response to the operator.
+    waitUntil(
+      runAnalysisPipeline(job.surveyId).catch((err) =>
+        console.error(`[drone-jobs] Auto-analysis failed for survey ${job.surveyId}:`, err)
+      )
     );
 
     return NextResponse.json(updated);
