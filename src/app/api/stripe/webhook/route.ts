@@ -102,6 +102,22 @@ export async function POST(req: NextRequest) {
       break;
     }
 
+    case "invoice.paid": {
+      // Reset leadCount to 0 at the start of each billing cycle so Basic plan
+      // roofers get their full 10-lead allowance refreshed every month.
+      const paidInvoice = event.data.object as Stripe.Invoice;
+      const paidSubRef = paidInvoice.parent?.subscription_details?.subscription;
+      const paidSubId = typeof paidSubRef === "string" ? paidSubRef : paidSubRef?.id;
+      if (paidSubId) {
+        await prisma.subscription.updateMany({
+          where: { stripeSubId: paidSubId },
+          data: { leadCount: 0 },
+        });
+        console.log(`[webhook] Reset leadCount for subscription ${paidSubId}`);
+      }
+      break;
+    }
+
     case "invoice.payment_failed": {
       const invoice = event.data.object as Stripe.Invoice;
       const subRef = invoice.parent?.subscription_details?.subscription;
