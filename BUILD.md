@@ -1,7 +1,7 @@
 # SkyVault — Build Guide
 
-> AI-powered roof survey and lead generation platform  
-> Stack: Next.js 14 · Neon Postgres · Auth.js v5 · Cloudflare R2 · Anthropic Claude · Stripe · Resend · Vercel
+> AI-powered roof survey and lead generation platform
+> Stack: Next.js 16 · Neon Postgres · Auth.js v5 · Cloudflare R2 · Anthropic Claude · Stripe · Resend · Vercel
 
 ---
 
@@ -34,27 +34,30 @@ SkyVault is a three-sided marketplace:
 |---|---|
 | **Customer** | Uploads roof images (or books a drone), receives an AI health report, requests quotes |
 | **Roofer** | Pays a monthly subscription, receives pre-qualified leads with report data, contacts customers |
-| **Drone Operator** | Accepts capture jobs in their area, uploads images, receives automated payout |
-| **Admin** | Manages users, verifies roofers, overrides reports, views metrics |
+| **Drone Operator** | Accepts capture jobs in their area, uploads images, payout processed by admin |
+| **Admin** | Manages users, verifies roofers, overrides reports, views metrics, impersonates any user |
 
 **Core value loop:** Customer uploads images → Claude Vision analyses them → branded PDF report generated → lead distributed to ≤3 subscribed roofers by postcode.
+
+**Live URL:** https://skyvault-7341.vercel.app (custom domain `skyvaultuk.com` — not yet pointed at Vercel)
 
 ---
 
 ## 2. Tech Stack
 
-| Layer | Choice | Reason |
+| Layer | Choice | Notes |
 |---|---|---|
-| Framework | Next.js 14 App Router (TypeScript) | Single codebase for all portals + API |
-| Database | Neon (serverless Postgres) + Prisma ORM | Serverless-native, zero cold-start connection pooling |
-| Auth | Auth.js v5 — Google OAuth + Resend magic link | No credential storage, fast setup |
-| File Storage | Cloudflare R2 (S3-compatible) | No egress fees, presigned URLs |
-| AI | Anthropic Claude claude-sonnet-4-6 (vision) | Structured JSON output, multimodal |
-| PDF | @react-pdf/renderer | Pure JS, no headless Chrome, serverless safe |
-| Email | Resend | Reliable transactional email, good DX |
-| Payments | Stripe Checkout + webhooks | Subscriptions + one-time payments + Connect |
-| UI | Tailwind CSS + Shadcn/ui | Fast to build, accessible |
-| Hosting | Vercel (Pro) | 60s function timeout needed for analyse route |
+| Framework | Next.js 16.2.6 App Router (TypeScript) | Single codebase for all portals + API |
+| Database | Neon (serverless Postgres) + Prisma ORM 6.x | Serverless-native, connection pooling via pgbouncer |
+| Auth | Auth.js v5 — Google OAuth + Resend magic link | `allowDangerousEmailAccountLinking: true` on Google provider |
+| File Storage | Cloudflare R2 (S3-compatible) | No egress fees, presigned URLs, 15-min upload TTL |
+| AI | Anthropic `claude-sonnet-4-5` (vision) | Structured JSON output, Zod-validated, Sharp image resizing |
+| PDF | @react-pdf/renderer | Pure JS, serverless safe, includes photo annex page |
+| Email | Resend | From: `noreply@skyvaultuk.com` (verified domain) |
+| Payments | Stripe Checkout + webhooks | Subscriptions + drone deposit (£50); webhook at `/api/stripe/webhook` |
+| UI | Tailwind CSS | No Shadcn/ui — plain Tailwind throughout |
+| Hosting | Vercel (Pro) | 60s timeout on analyse + drone-jobs routes |
+| Address lookup | Nominatim (OpenStreetMap) + postcodes.io | Free, no API key required |
 
 ---
 
@@ -65,13 +68,13 @@ node --version   # 18+
 npm --version    # 9+
 ```
 
-Accounts needed before you start:
+Accounts needed:
 
-- [Neon](https://neon.tech) — free tier is fine for dev
-- [Cloudflare](https://cloudflare.com) — R2 bucket (free 10GB/month)
+- [Neon](https://neon.tech) — Postgres database
+- [Cloudflare](https://cloudflare.com) — R2 bucket
 - [Anthropic](https://console.anthropic.com) — API key
-- [Stripe](https://stripe.com) — test mode is fine until launch
-- [Resend](https://resend.com) — free tier (100 emails/day)
+- [Stripe](https://stripe.com) — sandbox mode for development
+- [Resend](https://resend.com) — verified domain `skyvaultuk.com`
 - [Google Cloud Console](https://console.cloud.google.com) — OAuth 2.0 credentials
 - [Vercel](https://vercel.com) — Pro plan required (60s timeout)
 
@@ -79,48 +82,41 @@ Accounts needed before you start:
 
 ## 4. Environment Setup
 
-Copy `.env.example` to `.env.local` and fill in every value:
-
-```bash
-cp .env.example .env.local
-```
-
 ### Full `.env.local` reference
 
 ```bash
 # ── Neon (serverless Postgres) ─────────────────────────────────────────────
-DATABASE_URL="postgresql://user:pass@ep-xxx.neon.tech/skyvault?sslmode=require&pgbouncer=true"
-DIRECT_URL="postgresql://user:pass@ep-xxx.neon.tech/skyvault?sslmode=require"
-# Note: DATABASE_URL uses pgbouncer for pooling. DIRECT_URL is used by Prisma migrate.
+DATABASE_URL="postgresql://user:pass@ep-xxx-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+DIRECT_URL="postgresql://user:pass@ep-xxx.eu-west-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+# DATABASE_URL uses pgbouncer pooler. DIRECT_URL is used by Prisma migrate only.
 
 # ── Auth.js v5 ─────────────────────────────────────────────────────────────
-AUTH_SECRET=""          # openssl rand -base64 32
-AUTH_GOOGLE_ID=""       # Google Cloud Console → Credentials → OAuth 2.0
+AUTH_SECRET=""              # openssl rand -base64 32
+AUTH_GOOGLE_ID=""           # Google Cloud Console → OAuth 2.0 Client ID
 AUTH_GOOGLE_SECRET=""
-AUTH_RESEND_KEY=""      # Resend API key — Auth.js uses this for magic link emails
+AUTH_RESEND_KEY=""          # Resend API key — used by Auth.js for magic link emails
 NEXTAUTH_URL="http://localhost:3000"
 
 # ── Cloudflare R2 ──────────────────────────────────────────────────────────
-R2_ACCOUNT_ID=""        # Cloudflare dashboard → Account ID
-R2_ACCESS_KEY_ID=""     # R2 → Manage R2 API Tokens
+R2_ACCOUNT_ID=""
+R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
 R2_BUCKET_NAME="skyvault-uploads"
-R2_PUBLIC_URL=""        # Optional: custom domain or pub-xxx.r2.dev for public reads
 
 # ── Anthropic ──────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY="sk-ant-..."
 
 # ── Stripe ─────────────────────────────────────────────────────────────────
 STRIPE_SECRET_KEY="sk_test_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."    # stripe listen --forward-to localhost:3000/api/subscriptions/webhook
-STRIPE_BASIC_PRICE_ID="price_..."   # Basic plan recurring price (£49/mo)
-STRIPE_PRO_PRICE_ID="price_..."     # Pro plan recurring price (£129/mo)
-STRIPE_DRONE_PRICE_ID="price_..."   # One-time drone capture (£89)
+STRIPE_WEBHOOK_SECRET="whsec_..."
+STRIPE_BASIC_PRICE_ID="price_..."    # Basic plan £49/mo recurring
+STRIPE_PRO_PRICE_ID="price_..."      # Pro plan £129/mo recurring
+# Note: drone deposit uses inline price_data (£50) — no STRIPE_DRONE_PRICE_ID needed
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_test_..."
 
 # ── Resend ─────────────────────────────────────────────────────────────────
 RESEND_API_KEY="re_..."
-RESEND_FROM_EMAIL="noreply@skyvault.co.uk"
+# RESEND_FROM_EMAIL defaults to noreply@skyvaultuk.com — no env var needed unless overriding
 
 # ── App ────────────────────────────────────────────────────────────────────
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
@@ -136,13 +132,11 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 2. Copy the **pooled connection string** → `DATABASE_URL`
 3. Copy the **direct connection string** → `DIRECT_URL`
 
-### 2. Run migration
+### 2. Run migrations
 
 ```bash
-npx prisma migrate dev --name init
+npx prisma migrate deploy
 ```
-
-This creates all 12 tables: `User`, `Account`, `Session`, `VerificationToken`, `Property`, `Survey`, `Image`, `Report`, `Lead`, `LeadClaim`, `DroneJob`, `Subscription`.
 
 ### 3. Generate client
 
@@ -150,15 +144,7 @@ This creates all 12 tables: `User`, `Account`, `Session`, `VerificationToken`, `
 npx prisma generate
 ```
 
-### 4. Seed initial data
-
-```bash
-npx prisma db seed
-```
-
-Creates: 1 admin user, 1 sample roofer with active subscription, 1 sample survey with report.
-
-### 5. Inspect data
+### 4. Inspect data
 
 ```bash
 npx prisma studio
@@ -175,20 +161,20 @@ npx prisma studio
 2. Create OAuth 2.0 Client ID (Web application)
 3. Authorised redirect URIs:
    - `http://localhost:3000/api/auth/callback/google`
-   - `https://yourdomain.com/api/auth/callback/google`
+   - `https://skyvault-7341.vercel.app/api/auth/callback/google`
+   - `https://skyvaultuk.com/api/auth/callback/google` (when custom domain is live)
 4. Copy Client ID → `AUTH_GOOGLE_ID` and Client Secret → `AUTH_GOOGLE_SECRET`
 
 ### Cloudflare R2
 
 1. Cloudflare dashboard → R2 → Create bucket → name: `skyvault-uploads`
 2. R2 → Manage R2 API Tokens → Create token (Object Read & Write)
-3. Copy Account ID → `R2_ACCOUNT_ID`, Access Key → `R2_ACCESS_KEY_ID`, Secret → `R2_SECRET_ACCESS_KEY`
-4. Set CORS policy on the bucket (required for browser direct uploads):
+3. Set CORS policy on the bucket (required for browser direct uploads):
 
 ```json
 [
   {
-    "AllowedOrigins": ["http://localhost:3000", "https://skyvault.co.uk"],
+    "AllowedOrigins": ["http://localhost:3000", "https://skyvault-7341.vercel.app", "https://skyvaultuk.com"],
     "AllowedMethods": ["PUT"],
     "AllowedHeaders": ["Content-Type"],
     "MaxAgeSeconds": 3600
@@ -198,21 +184,19 @@ npx prisma studio
 
 ### Stripe
 
-1. [Stripe Dashboard](https://dashboard.stripe.com) → Test mode
+1. [Stripe Dashboard](https://dashboard.stripe.com) → Sandbox mode
 2. Create Products:
    - **SkyVault Basic** → Recurring £49/month → copy Price ID → `STRIPE_BASIC_PRICE_ID`
    - **SkyVault Pro** → Recurring £129/month → copy Price ID → `STRIPE_PRO_PRICE_ID`
-   - **Drone Capture** → One-time £89 → copy Price ID → `STRIPE_DRONE_PRICE_ID`
-3. Webhooks → Add endpoint: `https://yourdomain.com/api/subscriptions/webhook`
-   - Events to listen for: `checkout.session.completed`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`
+   - *(Drone deposit uses inline `price_data` — no product needed)*
+3. Webhooks → Add endpoint: `https://skyvault-7341.vercel.app/api/stripe/webhook`
+   - Events to subscribe: `checkout.session.completed`, `invoice.paid`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`
    - Copy Signing Secret → `STRIPE_WEBHOOK_SECRET`
-4. For local testing: `stripe listen --forward-to localhost:3000/api/subscriptions/webhook`
 
 ### Resend
 
-1. [resend.com](https://resend.com) → API Keys → Create Key
-2. Add and verify your sending domain
-3. Copy API key → `RESEND_API_KEY`
+1. Domain `skyvaultuk.com` already verified (DNS via Squarespace, eu-west-1 region)
+2. Emails send from `noreply@skyvaultuk.com` — this is hardcoded as the default fallback in `src/lib/resend.ts`
 
 ---
 
@@ -220,141 +204,119 @@ npx prisma studio
 
 ```
 roofAI/
-├── ARCHITECTURE.drawio          # System architecture diagram
 ├── BUILD.md                     # This file
-├── .env.example                 # Environment variable template
 ├── .env.local                   # Local secrets (gitignored)
 ├── next.config.ts               # serverComponentsExternalPackages for react-pdf
-├── vercel.json                  # 60s timeout on analyse route
+├── vercel.json                  # 60s timeout on analyse + drone-jobs routes
 ├── middleware.ts                # Role-based route protection
 ├── tailwind.config.ts
-├── tsconfig.json
 │
 ├── prisma/
-│   ├── schema.prisma            # All 12 models, enums, indexes
-│   └── seed.ts                  # Admin user, sample roofer + survey
-│
-├── public/
-│   └── logo.svg
+│   ├── schema.prisma            # 12 models, enums, indexes
+│   └── migrations/              # All applied migrations
 │
 └── src/
     ├── app/
-    │   ├── layout.tsx           # Root layout (Inter font, metadata)
+    │   ├── layout.tsx
     │   ├── page.tsx             # Marketing landing page
-    │   ├── globals.css
     │   │
     │   ├── (auth)/
-    │   │   ├── login/page.tsx   # Google OAuth + magic link sign-in
-    │   │   └── verify/page.tsx  # "Check your email" page
+    │   │   ├── login/page.tsx   # Google OAuth + magic link
+    │   │   ├── register/page.tsx
+    │   │   └── verify/page.tsx
     │   │
-    │   ├── (customer)/          # Role group — protected by middleware
-    │   │   ├── layout.tsx       # Sidebar nav shell
+    │   ├── (customer)/
+    │   │   ├── layout.tsx       # Sidebar nav (Dashboard, Surveys, Properties, My Quotes)
     │   │   ├── dashboard/page.tsx
     │   │   ├── properties/
     │   │   │   ├── page.tsx
-    │   │   │   ├── new/page.tsx
+    │   │   │   ├── new/page.tsx      # With Nominatim address autocomplete
     │   │   │   └── [id]/page.tsx
     │   │   ├── surveys/
-    │   │   │   ├── new/page.tsx
+    │   │   │   ├── page.tsx          # All surveys list
+    │   │   │   ├── new/page.tsx      # Survey type picker (self-upload / drone)
     │   │   │   └── [id]/
-    │   │   │       ├── page.tsx          # Image uploader + analyse trigger
-    │   │   │       └── report/page.tsx   # Report viewer
+    │   │   │       ├── page.tsx      # Uploader, notes field, analyse button
+    │   │   │       ├── drone-booking.tsx  # Calendar picker + £50 Stripe deposit
+    │   │   │       └── report/page.tsx    # Report viewer + photo gallery
     │   │   └── quotes/page.tsx
     │   │
-    │   ├── (roofer)/
+    │   ├── roofer/
     │   │   ├── layout.tsx
     │   │   ├── dashboard/page.tsx
     │   │   ├── leads/
-    │   │   │   ├── page.tsx             # Lead list (blurred until claimed)
-    │   │   │   └── [id]/page.tsx        # Full lead + contact details
+    │   │   │   ├── page.tsx          # Lead list (blurred until claimed)
+    │   │   │   └── [id]/
+    │   │   │       ├── page.tsx      # Full lead + customer contact (post-claim)
+    │   │   │       └── claim-button.tsx
     │   │   ├── subscription/
-    │   │   │   ├── page.tsx             # Plan picker
-    │   │   │   └── success/page.tsx     # Post-checkout confirmation
-    │   │   └── profile/page.tsx
+    │   │   │   ├── page.tsx          # Plan picker (Basic £49 / Pro £129)
+    │   │   │   └── success-banner.tsx
+    │   │   └── profile/
+    │   │       ├── page.tsx          # Company info, postcode coverage
+    │   │       └── profile-form.tsx
     │   │
-    │   ├── (operator)/
+    │   ├── drone/                    # Drone operator portal (spec called this /operator/)
     │   │   ├── layout.tsx
-    │   │   ├── dashboard/page.tsx
-    │   │   └── jobs/[id]/page.tsx       # Job detail + image upload
+    │   │   ├── dashboard/page.tsx    # Available + active jobs
+    │   │   └── jobs/[id]/page.tsx    # Accept, upload images, mark complete
     │   │
-    │   ├── (admin)/
-    │   │   ├── layout.tsx               # Dark sidebar
-    │   │   ├── dashboard/page.tsx       # Revenue metrics
+    │   ├── admin/
+    │   │   ├── layout.tsx            # Dark sidebar
+    │   │   ├── dashboard/page.tsx    # User/survey/lead counts + recent activity
     │   │   ├── surveys/page.tsx
     │   │   ├── users/
-    │   │   │   ├── page.tsx
-    │   │   │   └── [id]/page.tsx        # Role change, verify roofer
-    │   │   ├── roofers/page.tsx         # Pending verification queue
-    │   │   └── reports/[id]/page.tsx    # Report override UI
+    │   │   │   ├── page.tsx          # All users + role filter + impersonate button
+    │   │   │   ├── role-changer.tsx
+    │   │   │   ├── impersonate-button.tsx
+    │   │   │   └── delete-button.tsx
+    │   │   └── roofers/
+    │   │       ├── page.tsx          # Verification queue
+    │   │       └── verify-toggle.tsx
     │   │
     │   └── api/
     │       ├── auth/[...nextauth]/route.ts
+    │       ├── auth/register/route.ts
     │       ├── properties/
-    │       │   ├── route.ts             # GET list, POST create
-    │       │   └── [id]/route.ts        # GET, PUT, DELETE
+    │       │   ├── route.ts
+    │       │   └── [id]/route.ts
     │       ├── surveys/
-    │       │   ├── route.ts             # GET list, POST create
+    │       │   ├── route.ts
     │       │   └── [id]/
-    │       │       ├── route.ts         # GET detail, PATCH
-    │       │       ├── images/
-    │       │       │   ├── route.ts     # GET list, POST register
-    │       │       │   └── presign/route.ts  # POST → presigned PUT URL
-    │       │       ├── analyse/route.ts # POST → full AI pipeline
-    │       │       └── report/route.ts  # GET report + PDF URL
+    │       │       ├── route.ts
+    │       │       ├── images/route.ts
+    │       │       ├── images/presign/route.ts
+    │       │       └── analyse/route.ts       # Thin wrapper over lib/pipeline.ts
     │       ├── leads/
-    │       │   ├── route.ts             # GET (roofer's leads)
-    │       │   └── [id]/
-    │       │       ├── route.ts         # GET (partial or full)
-    │       │       └── claim/route.ts   # POST express interest
+    │       │   ├── route.ts
+    │       │   └── [id]/claim/route.ts
     │       ├── drone-jobs/
-    │       │   ├── route.ts             # GET available, POST create
-    │       │   └── [id]/
-    │       │       ├── route.ts         # GET, PATCH (accept/complete)
-    │       │       └── payout/route.ts  # POST trigger Stripe transfer
-    │       ├── subscriptions/
-    │       │   ├── checkout/route.ts    # POST → Stripe Checkout session
-    │       │   ├── portal/route.ts      # POST → Stripe Customer Portal
-    │       │   └── webhook/route.ts     # POST raw body — Stripe events
+    │       │   ├── route.ts
+    │       │   └── [id]/route.ts              # accept/complete — fires pipeline via waitUntil
+    │       ├── stripe/
+    │       │   ├── checkout/route.ts          # Roofer subscription checkout
+    │       │   ├── drone-checkout/route.ts    # £50 drone deposit checkout
+    │       │   ├── portal/route.ts            # Stripe Customer Portal
+    │       │   └── webhook/route.ts           # All Stripe events
+    │       ├── roofer/profile/route.ts
     │       └── admin/
-    │           ├── metrics/route.ts
-    │           ├── users/[id]/route.ts
-    │           └── reports/[id]/route.ts
+    │           ├── impersonate/route.ts       # JWT cookie swap for impersonation
+    │           └── users/[id]/route.ts
     │
     ├── components/
-    │   ├── ui/                          # Shadcn/ui base components
-    │   ├── layout/                      # Role-specific sidebars
-    │   ├── surveys/
-    │   │   ├── image-uploader.tsx       # Drag-drop → presign → XHR PUT
-    │   │   └── survey-card.tsx
-    │   ├── reports/
-    │   │   ├── condition-score-gauge.tsx
-    │   │   ├── defect-list.tsx
-    │   │   ├── report-pdf-template.tsx  # @react-pdf/renderer Document
-    │   │   └── report-viewer.tsx
-    │   ├── leads/
-    │   │   ├── lead-card.tsx            # Blurred vs unlocked states
-    │   │   └── lead-claim-button.tsx
-    │   └── subscription/
-    │       ├── plan-card.tsx
-    │       └── usage-meter.tsx
+    │   └── surveys/
+    │       └── image-uploader.tsx    # Drag-drop → presign → XHR PUT with progress
     │
-    ├── lib/
-    │   ├── auth.ts       # Auth.js config — providers, PrismaAdapter, role callbacks
-    │   ├── prisma.ts     # Singleton PrismaClient (hot-reload safe)
-    │   ├── r2.ts         # S3Client + presignedUpload + presignedRead + uploadBuffer
-    │   ├── stripe.ts     # Stripe client + PLANS constant
-    │   ├── resend.ts     # Email templates: reportReady, leadNotification
-    │   ├── claude.ts     # analyzeRoof() → RoofAnalysis (Zod-validated JSON)
-    │   ├── pdf.ts        # renderReportPDF() → Buffer
-    │   └── utils.ts      # cn(), formatScore(), extractPostcodePrefix(), formatDate()
-    │
-    ├── hooks/
-    │   ├── use-upload.ts       # presign → XHR PUT with per-file progress
-    │   └── use-survey-poll.ts  # polls survey status every 3s until complete/failed
-    │
-    └── types/
-        ├── next-auth.d.ts      # Augments session with id + role
-        └── index.ts            # DefectItem, RoofAnalysis, LeadSummary
+    └── lib/
+        ├── auth.ts        # Auth.js v5 config — Google + Resend, PrismaAdapter, role JWT callback
+        ├── prisma.ts      # Singleton PrismaClient
+        ├── r2.ts          # S3Client, presignedUpload, presignedRead, uploadBuffer, generatePdfKey
+        ├── stripe.ts      # Stripe client
+        ├── resend.ts      # notifyCustomerReportReady(), notifyRooferNewLead()
+        ├── claude.ts      # analyzeRoof() → RoofAnalysis (Zod-validated JSON)
+        ├── pdf.tsx        # renderReportPDF() → Buffer (includes photo annex page)
+        ├── pipeline.ts    # runAnalysisPipeline() — shared by analyse route + drone PATCH
+        └── leads.ts       # distributeLeads() — creates Lead, emails eligible roofers
 ```
 
 ---
@@ -364,11 +326,12 @@ roofAI/
 ### Enums
 
 ```
-Role:               customer | roofer | operator | admin
+Role:               customer | roofer | drone | admin
+                    (spec said "operator" — actual codebase uses "drone")
 PropertyType:       residential | commercial
 SurveyType:         self_upload | drone_capture
 SurveyStatus:       draft | pending | analysing | complete | failed
-ImageValidation:    pending | valid | invalid
+ImageValidationStatus: pending | valid | invalid
 ReportStatus:       draft | published | overridden
 LeadStatus:         open | closed
 LeadClaimStatus:    interested | quoted | won | lost
@@ -381,8 +344,9 @@ SubscriptionStatus: active | past_due | cancelled
 
 ```
 User ──< Property ──< Survey ──< Image
-                      Survey ──  Report ──  Lead ──< LeadClaim >── User (roofer)
-                      Survey ──  DroneJob >── User (operator)
+                      Survey ──  Report
+                      Survey ──  DroneJob >── User (drone operator)
+                      Survey ──  Lead ──< LeadClaim >── User (roofer)
 User (roofer) ──  Subscription
 ```
 
@@ -391,14 +355,14 @@ User (roofer) ──  Subscription
 | Model | Key fields |
 |---|---|
 | User | id, email, role, company, postcode, phone, verified |
-| Property | ownerId, address, postcode, type |
-| Survey | propertyId, customerId, type, status |
-| Image | surveyId, s3Key, validationStatus, sortOrder |
-| Report | surveyId, conditionScore (1-10), defectsJson, pdfS3Key, status |
+| Property | ownerId, address, postcode, town, type |
+| Survey | propertyId, customerId, type, status, notes |
+| Image | surveyId, s3Key, originalFilename, validationStatus, sortOrder |
+| Report | surveyId, conditionScore (1-10), defectsJson, pdfS3Key, status, adminNotes |
 | Lead | surveyId, reportId, postcode, maxRoofers (3), status |
 | LeadClaim | leadId, rooferId, status, quoteAmount |
-| DroneJob | surveyId, operatorId, status, payoutAmount (£30 default) |
-| Subscription | rooferId, plan, stripeSubId, leadCount, currentPeriodEnd |
+| DroneJob | surveyId, operatorId, status, postcode, payoutAmount (£30 default), scheduledAt |
+| Subscription | rooferId, plan, stripeSubId, leadCount, currentPeriodEnd, cancelAtPeriodEnd |
 
 ---
 
@@ -408,6 +372,7 @@ User (roofer) ──  Subscription
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET/POST | `/api/auth/[...nextauth]` | — | Auth.js catch-all |
+| POST | `/api/auth/register` | — | Email/name registration |
 
 ### Properties
 | Method | Path | Auth | Description |
@@ -416,48 +381,45 @@ User (roofer) ──  Subscription
 | POST | `/api/properties` | customer | Create property |
 | GET | `/api/properties/[id]` | owner/admin | Detail + surveys |
 | PUT | `/api/properties/[id]` | owner/admin | Update |
-| DELETE | `/api/properties/[id]` | owner/admin | Delete (blocks if active surveys) |
+| DELETE | `/api/properties/[id]` | owner/admin | Delete |
 
 ### Surveys
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/api/surveys` | any | List (role-scoped) |
 | POST | `/api/surveys` | customer | Create survey |
-| GET | `/api/surveys/[id]` | owner/operator/admin | Detail with images + report |
-| PATCH | `/api/surveys/[id]` | owner/admin | Update notes |
-| POST | `/api/surveys/[id]/images/presign` | owner/operator | Returns `{ s3Key, uploadUrl }` |
-| POST | `/api/surveys/[id]/images` | owner/operator | Register image after upload |
-| **POST** | **`/api/surveys/[id]/analyse`** | owner/admin | **Full AI pipeline (~30s)** |
-| GET | `/api/surveys/[id]/report` | owner/roofer-with-claim/admin | Report JSON + PDF URL |
+| GET | `/api/surveys/[id]` | owner/drone/admin | Detail with images + report |
+| PATCH | `/api/surveys/[id]` | owner/admin | Update notes; reset failed→draft |
+| POST | `/api/surveys/[id]/images/presign` | owner/drone | Returns `{ s3Key, uploadUrl }` |
+| POST | `/api/surveys/[id]/images` | owner/drone | Register image after upload |
+| **POST** | **`/api/surveys/[id]/analyse`** | owner/admin | **Runs full AI pipeline (~30s)** |
 
 ### Leads
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/api/leads` | roofer | Postcode-matched leads, paginated |
-| GET | `/api/leads/[id]` | roofer | Partial (unclaimed) or full (claimed) |
+| GET | `/api/leads` | roofer | All leads (postcode filter not yet enforced) |
 | POST | `/api/leads/[id]/claim` | roofer | Express interest — validates subscription + cap |
 
 ### Drone Jobs
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/api/drone-jobs` | operator | Available jobs by postcode |
-| GET | `/api/drone-jobs/[id]` | operator/admin | Job detail |
-| PATCH | `/api/drone-jobs/[id]` | operator/admin | Accept / complete job |
-| POST | `/api/drone-jobs/[id]/payout` | admin | Trigger Stripe transfer |
+| GET | `/api/drone-jobs` | drone/admin | All posted jobs |
+| GET | `/api/drone-jobs/[id]` | drone/admin | Job detail |
+| PATCH | `/api/drone-jobs/[id]` | drone/admin | Accept or complete job; complete auto-fires pipeline via `waitUntil` |
 
 ### Stripe
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/api/subscriptions/checkout` | roofer | Create Checkout session → `{ url }` |
-| POST | `/api/subscriptions/portal` | roofer | Create Portal session → `{ url }` |
-| POST | `/api/subscriptions/webhook` | Stripe sig | Handle subscription events |
+| POST | `/api/stripe/checkout` | roofer | Roofer subscription Checkout session |
+| POST | `/api/stripe/drone-checkout` | customer | £50 drone deposit Checkout session |
+| POST | `/api/stripe/portal` | roofer | Stripe Customer Portal session |
+| POST | `/api/stripe/webhook` | Stripe sig | `checkout.session.completed`, `invoice.paid`, `customer.subscription.*`, `invoice.payment_failed` |
 
 ### Admin
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/api/admin/metrics` | admin | Revenue, survey counts, conversion |
+| POST | `/api/admin/impersonate` | admin | Mint JWT for target user, set session cookie |
 | PATCH | `/api/admin/users/[id]` | admin | Role change, toggle verified |
-| PATCH | `/api/admin/reports/[id]` | admin | Override score/defects |
 
 ---
 
@@ -466,47 +428,46 @@ User (roofer) ──  Subscription
 ### Public
 | Path | Description |
 |---|---|
-| `/` | Marketing landing (hero, how-it-works, pricing) |
+| `/` | Marketing landing page |
 | `/login` | Google OAuth + magic link |
+| `/register` | Name + email registration |
 | `/verify` | "Check your email" |
 
 ### Customer
 | Path | Description |
 |---|---|
-| `/dashboard` | Survey count, quick actions, recent properties |
+| `/dashboard` | Survey count, quick actions, recent surveys |
 | `/properties` | Property list |
-| `/properties/new` | Add property form |
+| `/properties/new` | Add property — with address autocomplete (Nominatim) + postcode→town autofill |
 | `/properties/[id]` | Property detail + survey history |
-| `/surveys/new` | Survey type picker (self-upload / drone) |
-| `/surveys/[id]` | Image uploader, analyse button, status polling |
-| `/surveys/[id]/report` | Condition score, defect list, PDF download, quote CTA |
-| `/quotes` | Quote request status |
+| `/surveys` | All surveys list with status |
+| `/surveys/new` | Survey type picker (self-upload / drone capture) |
+| `/surveys/[id]` | Image uploader, customer notes field, analyse button, status display |
+| `/surveys/[id]/report` | Condition score, defect list, photo gallery, PDF download |
+| `/quotes` | Quote request status (stub) |
 
 ### Roofer
 | Path | Description |
 |---|---|
 | `/roofer/dashboard` | Lead feed, subscription status |
-| `/roofer/leads` | Lead list (blurred if no subscription) |
+| `/roofer/leads` | Lead list (blurred until claimed) |
 | `/roofer/leads/[id]` | Full lead detail + customer contact (after claim) |
-| `/roofer/subscription` | Plan picker (Basic £49 / Pro £129) |
-| `/roofer/subscription/success` | Post-checkout confirmation |
-| `/roofer/profile` | Company info, service postcodes |
+| `/roofer/subscription` | Plan picker (Basic £49 / Pro £129) + Stripe portal |
+| `/roofer/profile` | Company info, postcode coverage |
 
-### Operator
+### Drone Operator
 | Path | Description |
 |---|---|
-| `/operator/dashboard` | Available + active jobs |
-| `/operator/jobs/[id]` | Job detail, image upload portal |
+| `/drone/dashboard` | Available jobs + my accepted/completed jobs |
+| `/drone/jobs/[id]` | Accept job, upload images, mark complete |
 
 ### Admin
 | Path | Description |
 |---|---|
-| `/admin/dashboard` | MRR, surveys, subscriptions, leads |
+| `/admin/dashboard` | User counts, roofer verification status, survey counts, open leads, recent claims |
 | `/admin/surveys` | All surveys table |
-| `/admin/users` | All users, role filter |
-| `/admin/users/[id]` | User detail, role/verify controls |
-| `/admin/roofers` | Pending verification queue |
-| `/admin/reports/[id]` | Report override UI |
+| `/admin/users` | All users — role change, delete, impersonate |
+| `/admin/roofers` | Roofer verification queue with toggle |
 
 ---
 
@@ -515,66 +476,60 @@ User (roofer) ──  Subscription
 ### A. Customer Self-Upload Flow
 
 ```
-1. Customer creates account (Google or magic link)
-2. Add property → /properties/new → POST /api/properties
+1. Customer signs in (Google or magic link)
+2. Add property → /properties/new → address autocomplete → POST /api/properties
 3. Start survey → /surveys/new → POST /api/surveys { type: "self_upload" }
-4. Upload images:
+4. Upload images (up to 10):
    a. Browser POSTs to /api/surveys/[id]/images/presign
-   b. Server validates, generates R2 presigned PUT URL (15 min TTL)
-   c. Browser PUTs file directly to R2 (bypasses Next.js server)
-   d. Browser POSTs to /api/surveys/[id]/images to register s3Key in DB
-5. Click "Analyse" → POST /api/surveys/[id]/analyse
-   a. Sets survey.status = "analysing"
-   b. Fetches images server-side, encodes to base64
-   c. Calls Claude claude-sonnet-4-6 vision → structured JSON
-   d. Validates JSON with Zod schema
-   e. Renders PDF with @react-pdf/renderer → Buffer
-   f. Uploads PDF to R2 at surveys/<id>/report.pdf
-   g. Creates Report record in DB
-   h. Sets survey.status = "complete"
-   i. Distributes lead to ≤3 matching roofers (by postcode)
-   j. Sends "report ready" email via Resend
-6. Customer views report → /surveys/[id]/report
-7. Customer clicks "Request Quotes" → Lead status confirmed open
+   b. Server generates R2 presigned PUT URL (15 min TTL)
+   c. Browser PUTs file directly to R2 (bypasses Next.js)
+   d. Browser POSTs to /api/surveys/[id]/images to register s3Key
+5. Optionally add notes/concerns (sent to Claude, injection-protected)
+6. Click "Analyse" → POST /api/surveys/[id]/analyse → runAnalysisPipeline()
+   a. survey.status = "analysing"
+   b. Fetch images from R2, resize with Sharp, encode to base64
+   c. Call Claude Vision → Zod-validated RoofAnalysis JSON
+   d. Render PDF with @react-pdf/renderer (includes photo annex)
+   e. Upload PDF to R2
+   f. Create Report record in DB
+   g. survey.status = "complete"
+   h. distributeLeads() → creates Lead, emails eligible roofers
+   i. notifyCustomerReportReady() → Resend email
+7. Customer views report → /surveys/[id]/report
 ```
 
 ### B. Drone Capture Flow
 
 ```
 1. Customer starts survey → type: "drone_capture"
-2. Redirected to Stripe Checkout (£89 one-time)
-3. Stripe webhook: checkout.session.completed → creates DroneJob (status: posted)
-4. Operator sees job in /operator/dashboard matching their postcode
-5. Operator accepts → DroneJob.status = "accepted"
-6. Operator captures images, uploads via /operator/jobs/[id]
-   (same presign endpoint — ownership check extended to accepted operator)
-7. Operator marks complete → triggers analyse pipeline automatically
-8. Customer notified when report is ready (target: 48h from booking)
+2. Calendar picker → selects date/time → £50 Stripe Checkout
+3. Stripe webhook: checkout.session.completed → creates DroneJob (status: posted, scheduledAt set)
+4. Operator sees job in /drone/dashboard
+5. Operator clicks job → Accept → DroneJob.status = "accepted"
+6. Operator captures images, uploads via /drone/jobs/[id] (same presign endpoint)
+7. Operator clicks "Mark job complete"
+   → DroneJob.status = "images_uploaded"
+   → waitUntil(runAnalysisPipeline()) fires in background
+   → Operator gets instant confirmation
+8. Pipeline runs: Claude → PDF → report → lead distributed → customer email
+   (target: under 60 seconds from operator marking complete)
 ```
 
 ### C. Roofer Subscription + Lead Flow
 
 ```
-1. Roofer registers → POST /api/auth (Google/email)
-2. Selects plan → POST /api/subscriptions/checkout → Stripe Checkout
-3. Stripe webhook: checkout.session.completed → creates Subscription record
-4. When customer requests quotes:
-   - distributeLeads() finds eligible roofers:
-     * role = "roofer", verified = true
-     * subscription.status = "active"
-     * postcode prefix matches property (e.g. "SW1" matches "SW1A 1AA")
-     * Basic plan: leadCount < 10
-     * Pro plan: unlimited
-   - Orders by: Pro plan first, then FIFO
-   - Takes top 3 → creates Lead + LeadClaim records → sends email
-5. Roofer sees lead in /roofer/leads (blurred: postcode, score, defect types only)
-6. Roofer clicks "Express Interest" → POST /api/leads/[id]/claim
-   - Validates subscription active + not at quota
-   - Creates LeadClaim
-   - Increments subscription.leadCount
-   - Returns full report + customer name/email/phone
-7. Lead.status = "closed" when maxRoofers (3) claims reached
-8. On invoice.paid webhook: subscription.leadCount reset to 0
+1. Roofer registers → role = "roofer"
+2. Goes to /roofer/subscription → selects plan → Stripe Checkout
+3. Stripe webhook: customer.subscription.created → Subscription record created
+4. When a customer report completes:
+   - distributeLeads() finds all roofers with active subscription
+   - Emails each eligible roofer with link to /roofer/leads/[id]
+   - Note: postcode filtering not yet enforced — all active subscribers receive leads
+5. Roofer sees lead in /roofer/leads (blurred: score + defect types only)
+6. Roofer clicks "Express Interest" → LeadClaim created → leadCount incremented
+   → Full report + customer name/email/phone revealed
+7. Lead.status = "closed" when 3 claims reached
+8. On invoice.paid: subscription.leadCount reset to 0 (Basic plan 10/month cap refreshes)
 ```
 
 ---
@@ -583,106 +538,93 @@ User (roofer) ──  Subscription
 
 ### Phase 1 — Foundation ✅ Complete
 
-- [x] Next.js 14 scaffold with TypeScript + Tailwind
-- [x] All dependencies installed
+- [x] Next.js 16 scaffold with TypeScript + Tailwind
 - [x] Prisma schema (12 models, all enums + indexes)
-- [x] `src/lib/prisma.ts` — singleton PrismaClient
-- [x] `src/lib/auth.ts` — Auth.js v5 (Google + Resend, PrismaAdapter, role callback)
-- [x] `src/types/next-auth.d.ts` — session augmented with `id` + `role`
+- [x] Auth.js v5 — Google OAuth + Resend magic link, PrismaAdapter, role JWT callback
+- [x] `allowDangerousEmailAccountLinking: true` on Google provider
 - [x] `middleware.ts` — role-based route protection
-- [x] `/login` + `/verify` pages
-- [x] Customer, Roofer, Operator, Admin layout shells
-- [x] Customer + Roofer + Operator + Admin dashboard pages
+- [x] `/login`, `/register`, `/verify` pages
+- [x] Customer, Roofer, Drone, Admin layout shells
 - [x] Marketing landing page
-- [x] `next.config.ts` — react-pdf external package
-- [x] `vercel.json` — 60s timeout on analyse route
-- [x] `.env.example` — all 18 variables documented
-
-**Gate:** Sign in with Google → session has `id` + `role` → protected routes redirect correctly.
+- [x] `vercel.json` — 60s timeout on analyse + drone-jobs routes
+- [x] All environment variables documented
 
 ---
 
-### Phase 2 — Image Upload 🔄 In Progress
+### Phase 2 — Image Upload ✅ Complete
 
-- [x] `src/lib/r2.ts` — S3Client, `getPresignedUploadUrl()`, `getPresignedReadUrl()`, `uploadBuffer()`
-- [x] `GET/POST /api/properties` + `GET/PUT/DELETE /api/properties/[id]`
-- [x] `GET/POST /api/surveys` + `GET/PATCH /api/surveys/[id]`
-- [x] `POST /api/surveys/[id]/images/presign`
-- [x] `GET/POST /api/surveys/[id]/images`
-- [x] `src/hooks/use-upload.ts` — presign → XHR PUT with progress
-- [x] `src/hooks/use-survey-poll.ts` — 3s polling
-- [x] `src/components/surveys/image-uploader.tsx`
-- [x] `/properties` list + `/properties/new` form
-- [ ] `/properties/[id]` detail page
-- [ ] `/surveys/new` — survey type picker
-- [ ] `/surveys/[id]` — upload page with analyse button
-
-**Gate:** 5 images uploaded to R2 bucket, Image records in DB.
+- [x] `src/lib/r2.ts` — S3Client, presigned upload/read, uploadBuffer, generatePdfKey
+- [x] Properties CRUD API + pages
+- [x] Surveys CRUD API
+- [x] Presign → R2 direct upload flow
+- [x] `image-uploader.tsx` — drag-drop with per-file progress
+- [x] `/properties/new` with Nominatim address autocomplete + postcodes.io town autofill
+- [x] `/properties/[id]` detail page
+- [x] `/surveys/new` — survey type picker
+- [x] `/surveys/[id]` — image uploader + customer notes field + analyse button
+- [x] `/surveys` — all surveys list
 
 ---
 
-### Phase 3 — AI Pipeline & Reports
+### Phase 3 — AI Pipeline & Reports ✅ Complete
 
-- [ ] `src/lib/claude.ts` — `analyzeRoof()` base64 images → Claude → Zod-parsed JSON
-- [ ] `src/lib/pdf.ts` — `renderReportPDF()` → Buffer via `@react-pdf/renderer`
-- [ ] `src/lib/resend.ts` — report-ready + lead-notification email templates
-- [ ] `POST /api/surveys/[id]/analyse` — full 11-step pipeline
-- [ ] `GET /api/surveys/[id]/report` — report JSON + PDF presigned URL
-- [ ] `src/components/reports/condition-score-gauge.tsx`
-- [ ] `src/components/reports/defect-list.tsx`
-- [ ] `src/components/reports/report-pdf-template.tsx`
-- [ ] `/surveys/[id]/report` — report viewer page
-
-**Gate:** End-to-end: 5 images → report in DB → PDF in R2 → email received → report viewable in-app.
+- [x] `src/lib/claude.ts` — `analyzeRoof()` with Zod-validated JSON, prompt injection protection
+- [x] `src/lib/pdf.tsx` — `renderReportPDF()` with photo annex page
+- [x] `src/lib/pipeline.ts` — `runAnalysisPipeline()` shared function (10 steps)
+- [x] `src/lib/resend.ts` — `notifyCustomerReportReady()` + `notifyRooferNewLead()`
+- [x] `POST /api/surveys/[id]/analyse` — validates then calls pipeline
+- [x] Sharp image resizing before Claude (max 1568px, JPEG, ~500KB each)
+- [x] `/surveys/[id]/report` — score gauge, defects, recommendations, photo gallery, PDF download
+- [x] `survey.status = "failed"` on pipeline error with retry flow
 
 ---
 
-### Phase 4 — Roofer Subscriptions & Lead Flow
+### Phase 4 — Roofer Subscriptions & Lead Flow ✅ Complete
 
-- [ ] `src/lib/stripe.ts` — Stripe client + PLANS constant
-- [ ] `POST /api/subscriptions/checkout`
-- [ ] `POST /api/subscriptions/portal`
-- [ ] `POST /api/subscriptions/webhook` — raw body, Stripe sig verify, 4 events
-- [ ] `distributeLeads()` — postcode match, pro-first, max 3
-- [ ] `GET /api/leads` + `GET /api/leads/[id]` (partial vs full)
-- [ ] `POST /api/leads/[id]/claim`
-- [ ] `/roofer/leads` list (blurred until claimed)
-- [ ] `/roofer/leads/[id]` full detail
-- [ ] `/roofer/subscription` plan picker
-- [ ] `/roofer/profile` postcode coverage
+- [x] `src/lib/stripe.ts` — Stripe client
+- [x] `POST /api/stripe/checkout` — subscription checkout
+- [x] `POST /api/stripe/portal` — Stripe Customer Portal
+- [x] Webhook: `customer.subscription.created/updated/deleted`, `invoice.paid` (leadCount reset), `invoice.payment_failed`
+- [x] `distributeLeads()` — creates Lead, emails all active roofers
+- [x] `GET /api/leads` + `POST /api/leads/[id]/claim`
+- [x] `/roofer/leads` — blurred list
+- [x] `/roofer/leads/[id]` — full detail + customer contact post-claim
+- [x] `/roofer/subscription` — plan picker + portal button
+- [x] `/roofer/profile` — company info + postcode
 
-**Gate:** Roofer subscribes (Stripe test mode) → receives lead email → claims → sees full report + contact details.
-
----
-
-### Phase 5 — Drone Operator Flow
-
-- [ ] Extend `POST /api/surveys` — `drone_capture` type → Stripe Checkout redirect
-- [ ] Webhook handler: drone checkout → create DroneJob
-- [ ] `GET /api/drone-jobs` — available jobs by postcode
-- [ ] `GET/PATCH /api/drone-jobs/[id]` — accept / complete
-- [ ] `POST /api/drone-jobs/[id]/payout` — admin trigger
-- [ ] `/operator/dashboard` — available + active jobs
-- [ ] `/operator/jobs/[id]` — job detail + image upload (reuses `ImageUploader`)
-
-**Gate:** Customer pays → DroneJob created → operator accepts → uploads → analysis pipeline runs automatically.
+**Known gap:** Lead distribution emails all active subscribers regardless of postcode. Postcode filtering spec'd but not yet enforced.
 
 ---
 
-### Phase 6 — Admin & Hardening
+### Phase 5 — Drone Operator Flow ✅ Complete
 
-- [ ] `/admin/surveys` — all surveys table with status filter
-- [ ] `/admin/users` + `/admin/users/[id]` — role change, verify toggle
-- [ ] `/admin/roofers` — pending verification queue
-- [ ] `/admin/reports/[id]` — override score/defects/notes
-- [ ] `GET /api/admin/metrics` — MRR, survey counts, lead conversion
-- [ ] Zod validation on all API route inputs
-- [ ] Rate limiting on `/api/surveys/[id]/analyse` (1 per survey)
-- [ ] Pipeline error handling → `survey.status = "failed"` → retry email
-- [ ] `prisma/seed.ts` — admin user + sample data
-- [ ] OWASP Top 10 security review
+- [x] `/surveys/[id]/drone-booking.tsx` — calendar UI (next 30 days, 4 time slots)
+- [x] `POST /api/stripe/drone-checkout` — £50 inline deposit checkout with scheduledAt metadata
+- [x] Webhook: `checkout.session.completed` → creates DroneJob
+- [x] `GET /api/drone-jobs` — all posted jobs
+- [x] `PATCH /api/drone-jobs/[id]` — accept / complete; complete uses `waitUntil` to auto-fire pipeline
+- [x] `/drone/dashboard` — available + my jobs
+- [x] `/drone/jobs/[id]` — accept, upload images, mark complete
 
-**Gate:** Admin verifies roofer, overrides report, views revenue metrics.
+**Known gap:** Drone operator payout (`/api/drone-jobs/[id]/payout`) not built. Admin manually processes payouts. Deferred — founder is sole operator at launch.
+
+**Known gap:** Drone dashboard shows all posted jobs with no postcode filter.
+
+---
+
+### Phase 6 — Admin & Hardening ⚠️ Partially Complete
+
+- [x] `/admin/dashboard` — user/survey/lead counts + recent surveys + recent claims
+- [x] `/admin/surveys` — all surveys table
+- [x] `/admin/users` — all users, role change, delete, **impersonate** (bonus)
+- [x] `/admin/roofers` — verification queue with toggle
+- [x] `POST /api/admin/impersonate` — JWT cookie mint for any user (admin only)
+- [ ] `/admin/reports/[id]` — report override UI (score/defects/notes) — **NOT BUILT**
+- [ ] `GET /api/admin/metrics` — MRR calculation — **NOT BUILT** (counts exist, revenue figure missing)
+- [ ] Zod validation on API route inputs — **NOT DONE**
+- [ ] Rate limiting on analyse route — **NOT DONE**
+- [ ] `prisma/seed.ts` — demo data — **NOT BUILT**
+- [ ] OWASP security review — **NOT DONE**
 
 ---
 
@@ -696,116 +638,84 @@ npm install
 npx prisma generate
 
 # Run database migrations
-npx prisma migrate dev
-
-# Seed sample data
-npx prisma db seed
+npx prisma migrate deploy
 
 # Start dev server
 npm run dev
-# App runs at http://localhost:3000
-
-# In a separate terminal — forward Stripe webhooks
-stripe listen --forward-to localhost:3000/api/subscriptions/webhook
-
-# Open Prisma Studio (optional)
-npx prisma studio
+# App at http://localhost:3000
 ```
 
 ---
 
 ## 14. Deploying to Vercel
 
-### 1. Push to GitHub
+### Current deployment
 
-```bash
-git add .
-git commit -m "Initial SkyVault build"
-git push origin main
-```
+- **URL:** https://skyvault-7341.vercel.app
+- **Repo:** github.com/danskyvaultuk/skyvault
+- **Branch:** main (auto-deploys on push)
 
-### 2. Connect to Vercel
+### Environment variables to set in Vercel
 
-1. [vercel.com](https://vercel.com) → New Project → Import from GitHub
-2. Framework Preset: **Next.js** (auto-detected)
-3. Add all environment variables from `.env.local` (except `NEXTAUTH_URL` — set to your production domain)
+All variables from `.env.local` except:
+- `NEXTAUTH_URL` — set to `https://skyvault-7341.vercel.app` (or custom domain when live)
+- `NEXT_PUBLIC_APP_URL` — set to `https://skyvault-7341.vercel.app`
 
-### 3. Configure function timeout
+### Go-live checklist (when ready)
 
-`vercel.json` at project root already sets 60s on the analyse route:
-
-```json
-{
-  "functions": {
-    "src/app/api/surveys/[id]/analyse/route.ts": {
-      "maxDuration": 60
-    }
-  }
-}
-```
-
-> **Note:** Requires Vercel **Pro** plan. Hobby plan caps at 10s.
-
-### 4. Update OAuth redirect URIs
-
-Add your production domain to:
-- Google Cloud Console → Authorised redirect URIs
-- Auth.js `NEXTAUTH_URL` env var
-
-### 5. Update Stripe webhook endpoint
-
-Stripe Dashboard → Webhooks → Add endpoint:
-`https://yourdomain.com/api/subscriptions/webhook`
+- [ ] Point `skyvaultuk.com` → Vercel (add domain in Vercel project settings)
+- [ ] Update Google OAuth redirect URIs to include `https://skyvaultuk.com/api/auth/callback/google`
+- [ ] Update `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` in Vercel to `https://skyvaultuk.com`
+- [ ] Switch Stripe from sandbox to live mode:
+  - New live webhook endpoint + signing secret
+  - Live `STRIPE_SECRET_KEY`, `STRIPE_BASIC_PRICE_ID`, `STRIPE_PRO_PRICE_ID`
+  - Live `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- [ ] Update R2 CORS policy to include `https://skyvaultuk.com`
+- [ ] Redeploy after all env var changes
 
 ---
 
 ## 15. Testing Checklist
 
-### End-to-end smoke test
-
+### Self-upload flow
 ```
-[ ] Sign in with Google → confirm session.user.role = "customer"
-[ ] Create property → confirm Property record in DB
-[ ] Create self-upload survey → confirm Survey record, status = "draft"
-[ ] Upload 5 roof images → confirm Image records in DB + files in R2 bucket
-[ ] Trigger analysis → confirm survey.status transitions: draft → analysing → complete
-[ ] Confirm Report record in DB with conditionScore + defectsJson
-[ ] Confirm PDF in R2 at surveys/<id>/report.pdf
-[ ] Confirm "report ready" email received
-[ ] View report at /surveys/[id]/report → score gauge + defect list visible
-[ ] Download PDF → opens correctly
-
-[ ] Register roofer account → role = "roofer"
-[ ] Subscribe → Stripe test mode → Basic plan
-[ ] Confirm Subscription record, status = "active"
-[ ] Customer requests quotes → confirm Lead created
-[ ] Confirm roofer receives lead notification email
-[ ] Roofer claims lead → LeadClaim created, leadCount incremented
-[ ] Roofer sees full report + customer contact details
-
-[ ] Admin signs in → role = "admin"
-[ ] Verify roofer → User.verified flips to true
-[ ] Override report → Report.status = "overridden", adminNotes saved
-[ ] Admin metrics dashboard shows correct counts
-
-[ ] Drone operator registers → role = "operator"
-[ ] Customer creates drone_capture survey → Stripe Checkout (test mode)
-[ ] Confirm DroneJob created after checkout.session.completed webhook
-[ ] Operator accepts job → DroneJob.status = "accepted"
-[ ] Operator uploads images → confirm analysis pipeline runs
+[ ] Sign in with Google → role = "customer"
+[ ] Create property → address autocomplete works
+[ ] Create self-upload survey
+[ ] Upload images → files appear in R2 bucket
+[ ] Add customer notes
+[ ] Click "Analyse" → survey transitions: draft → analysing → complete
+[ ] Report email received at customer address
+[ ] View report → score, defects, photo gallery, PDF download all work
 ```
 
-### Stripe webhook test events
+### Drone capture flow
+```
+[ ] Create drone_capture survey
+[ ] Calendar picker visible → select date + time
+[ ] £50 Stripe Checkout (sandbox) → payment succeeds
+[ ] DroneJob created in DB (via checkout.session.completed webhook)
+[ ] Switch to drone operator → job appears in /drone/dashboard
+[ ] Accept job → upload images → mark complete
+[ ] Survey auto-analyses → report ready without any customer action
+[ ] Customer receives report email
+```
 
-```bash
-# Simulate subscription created
-stripe trigger checkout.session.completed
+### Roofer subscription + lead flow
+```
+[ ] Register roofer account
+[ ] Subscribe via Stripe (sandbox) → Subscription record active
+[ ] Complete a customer survey → roofer receives lead email
+[ ] Roofer claims lead → full contact details revealed → leadCount incremented
+[ ] Simulate invoice.paid → leadCount resets to 0
+```
 
-# Simulate invoice paid (resets leadCount)
-stripe trigger invoice.paid
-
-# Simulate subscription cancelled
-stripe trigger customer.subscription.deleted
+### Admin
+```
+[ ] Sign in as admin
+[ ] Verify a roofer → User.verified = true
+[ ] Impersonate customer, roofer, drone operator → each portal loads correctly
+[ ] View /admin/surveys, /admin/users, /admin/roofers
 ```
 
 ---
@@ -814,44 +724,34 @@ stripe trigger customer.subscription.deleted
 
 ### Why images bypass the Next.js server
 
-Browser uploads go **directly to Cloudflare R2** via a presigned URL. The Next.js server generates the URL (15-minute TTL) but never receives the image bytes. This means:
-- No 4.5MB Vercel body size limit issue
-- No wasted serverless compute on file transfer
-- Images can be 20MB each without any server config change
+Browser uploads go **directly to Cloudflare R2** via presigned URLs. The server generates the URL (15-min TTL) but never touches the bytes. No 4.5MB Vercel body limit, no compute cost on upload.
 
 ### Why Claude gets base64 images, not URLs
 
-R2 objects are private (no public read). Passing presigned URLs to Claude is unreliable — URLs expire and Claude may not follow redirects consistently. Instead, `lib/claude.ts` fetches each image server-side, encodes to base64, and passes as `image` blocks in the messages API. For 10 images at ~500KB each the payload is ~5MB, well within Claude's limits. Add `sharp` server-side to resize before encoding if images are large.
+R2 objects are private. Presigned URLs passed to Claude are unreliable (may expire mid-request). The pipeline fetches each image server-side, resizes with Sharp (max 1568px, JPEG, ~500KB), encodes to base64, and passes as `image` blocks. 10 images ≈ 5MB payload — well within Claude's limits.
 
-### Why the Stripe webhook uses `req.text()`, not `req.json()`
+### Why `waitUntil` is used on the drone-jobs route
 
-Stripe's signature verification (`stripe.webhooks.constructEvent`) requires the **raw request body as a string or Buffer**. Next.js App Router parses bodies automatically. Use `req.text()` in the webhook route to get the unparsed body, then pass it to `constructEvent`. Using `req.json()` will always fail verification.
+When a drone operator marks a job complete, the PATCH handler returns immediately so the operator gets instant feedback. `waitUntil` from `@vercel/functions` keeps the serverless function alive for the full pipeline duration (up to 60 seconds) even after the response is sent. Without it, Vercel terminates the function on response, killing the background pipeline.
 
-### Why `@react-pdf/renderer` over Puppeteer
+### Why `lib/pipeline.ts` exists
 
-Puppeteer requires a headless Chrome binary — incompatible with Vercel's serverless environment without complex workarounds. `@react-pdf/renderer` is pure JavaScript, generates PDFs from React component trees server-side via `renderToBuffer()`, and runs in any Node.js context. The tradeoff is less CSS flexibility (custom layout engine), but it's more than sufficient for a structured report.
+Both the manual analyse route (`POST /api/surveys/[id]/analyse`) and the auto-trigger after drone job completion (`PATCH /api/drone-jobs/[id]`) run the same 10-step pipeline. Extracting it into `runAnalysisPipeline(surveyId)` keeps the logic in one place and makes both entry points thin wrappers.
 
-### Postcode matching strategy
+### Postcode matching — current vs spec
 
-**MVP:** Store roofer's coverage as `User.postcode` (single area prefix). Match leads by `property.postcode.startsWith(extractPostcodePrefix(roofer.postcode))` where `extractPostcodePrefix("SW1A 1AA") = "SW1"`.
+**Current:** `distributeLeads()` sends to all roofers with an active subscription regardless of postcode. Fast to implement, acceptable at low volume.
 
-**Post-MVP:** Add `postcodesCovered String[]` to User. Query with Prisma `hasSome`:
-```typescript
-where: { postcodesCovered: { hasSome: [leadPostcodePrefix] } }
-```
+**Spec:** Filter by `outwardCode(property.postcode)` matching `outwardCode(roofer.postcode)`. To implement: add the `where: { postcode: { startsWith: outwardCode } }` filter back into the `findMany` in `lib/leads.ts`.
 
-### Lead distribution ordering
+### Stripe webhook path
 
-When distributing a lead to ≤3 roofers:
-1. Filter: `verified = true`, `subscription.status = "active"`, postcode match, quota not exceeded
-2. Order: Pro plan roofers first (unlimited leads), then Basic by subscription start date (FIFO)
-3. Take first 3
-4. Create LeadClaim + send notification email for each
+The spec specified `/api/subscriptions/webhook`. The actual path is `/api/stripe/webhook`. All Stripe events (subscriptions + drone deposits) go to this single endpoint.
 
 ### Auth.js session role
 
-The `role` field is not on the session by default. It's added via the `session` callback in `lib/auth.ts` and type-augmented in `types/next-auth.d.ts`. Every API route that needs role checking calls `const session = await auth()` and reads `session.user.role`.
+`role` is added to the JWT in the `jwt` callback in `lib/auth.ts` and type-augmented in `types/next-auth.d.ts`. A DB lookup runs on first sign-in if the role isn't already in the token (handles users whose role was changed after their token was issued).
 
 ---
 
-*Last updated: May 2026 — SkyVault MVP v1.0*
+*Last updated: May 2026 — SkyVault MVP v1.1*
