@@ -102,7 +102,6 @@ export default function BlogPost3DDemo() {
             height="600px"
             rotationAxis="y"
             rotationSpeed={15}
-            orientation="-90deg 0deg 0deg"
           />
           <p className="mt-3 text-sm text-gray-400 text-center">
             Interactive 3D model — drag to rotate, pinch to zoom. Generated from 63
