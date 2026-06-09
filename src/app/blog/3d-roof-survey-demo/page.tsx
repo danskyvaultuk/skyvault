@@ -66,7 +66,7 @@ export default function BlogPost3DDemo() {
         <div className="relative w-full h-72 rounded-xl overflow-hidden mb-10 border border-gray-100">
           <Image
             src={post.featuredImage}
-            alt="Georeferenced orthophoto of Miles & Katie's property"
+            alt="Georeferenced orthophoto of a residential property"
             fill
             className="object-cover"
             priority
@@ -89,8 +89,12 @@ export default function BlogPost3DDemo() {
             of the roof you can rotate, zoom, and inspect from any angle.
           </p>
           <p className="text-lg text-gray-700 leading-relaxed mt-4">
-            Below is the real output from Miles & Katie&apos;s property. This is not a
-            render — it&apos;s built entirely from drone imagery.
+            The model below is an early test capture — a single photogrammetry pass
+            rather than our full two-pass protocol. You&apos;ll notice some gaps and
+            rough edges at the model boundaries; these are a direct result of the
+            reduced image coverage. A production Pro Survey with the full capture
+            protocol produces a significantly cleaner, more complete mesh. This is
+            not a render — it&apos;s built entirely from real drone imagery.
           </p>
         </section>
 
@@ -98,14 +102,14 @@ export default function BlogPost3DDemo() {
         <section className="mb-4">
           <ModelViewerWrapper
             src={post.modelUrl}
-            alt="Interactive 3D model of Miles & Katie's roof"
+            alt="Interactive 3D model of a residential roof survey"
             height="600px"
             rotationAxis="y"
             rotationSpeed={15}
           />
           <p className="mt-3 text-sm text-gray-400 text-center">
-            Interactive 3D model — drag to rotate, pinch to zoom. Generated from 63
-            drone images via OpenDroneMap.
+            Interactive 3D model — drag to rotate, pinch to zoom. Single-pass test
+            capture processed via OpenDroneMap.
           </p>
         </section>
 
@@ -119,11 +123,11 @@ export default function BlogPost3DDemo() {
                   ["Capture method", "Licensed drone operator"],
                   ["Total images", "63"],
                   ["Flight altitude", "15–25 m AGL"],
-                  ["Passes", "2 (defect + photogrammetry)"],
+                  ["Capture type", "Single-pass photogrammetry (test)"],
                   ["Processing software", "OpenDroneMap"],
                   ["3D outputs", "Orthophoto, DSM, GLB mesh"],
                   ["Point cloud", "Available (.LAZ)"],
-                  ["Location", "East Midlands, UK"],
+                  ["Location", "UK — residential property"],
                 ].map(([label, value]) => (
                   <tr key={label}>
                     <td className="py-2 pr-4 text-gray-500 font-medium">{label}</td>
@@ -135,12 +139,12 @@ export default function BlogPost3DDemo() {
           </div>
 
           <div>
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Two-Pass Capture Protocol</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">The Full Two-Pass Protocol</h2>
             <p className="text-sm text-gray-600 leading-relaxed mb-3">
-              Pass 1 captures 30–60 close oblique shots at 5–10 m altitude — the
-              primary input for Claude Vision defect analysis. The operator works
-              systematically: ridge, front slope, rear slope, gutters, chimney and
-              all flashings.
+              A production Pro Survey uses two structured passes. Pass 1 captures
+              30–60 close oblique shots at 5–10 m altitude — the primary input for
+              Claude Vision defect analysis. The operator works systematically:
+              ridge, front slope, rear slope, gutters, chimney and all flashings.
             </p>
             <p className="text-sm text-gray-600 leading-relaxed mb-3">
               Pass 2 is a photogrammetry grid: nadir (straight-down) shots on a
@@ -149,8 +153,9 @@ export default function BlogPost3DDemo() {
               model, and textured 3D mesh.
             </p>
             <p className="text-sm text-gray-600 leading-relaxed">
-              The two streams are analysed independently and combined into a single
-              report — defect locations from AI, spatial measurements from ODM.
+              The model shown here was captured in a single pass — so it gives you
+              a good sense of the output, but a full two-pass survey produces
+              noticeably sharper geometry and better edge coverage.
             </p>
           </div>
         </section>

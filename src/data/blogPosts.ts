@@ -20,7 +20,7 @@ export const blogPosts: BlogPost[] = [
       "See how drone capture and photogrammetry produces a fully interactive 3D model of any property roof.",
     date: "June 2026",
     tags: ["Pro Survey", "Technology"],
-    featuredImage: "/images/blog/miles-and-katies-orthophoto.jpg",
-    modelUrl: `${PUBLIC_ASSETS_BASE}/blog/models/miles-and-katies/model.glb`,
+    featuredImage: "/images/blog/roof-survey-demo-orthophoto.jpg",
+    modelUrl: `${PUBLIC_ASSETS_BASE}/blog/models/roof-survey-demo/model.glb`,
   },
 ];
