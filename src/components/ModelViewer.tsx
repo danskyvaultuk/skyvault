@@ -23,7 +23,7 @@ export default function ModelViewer({
   src,
   alt,
   height = "600px",
-  rotationAxis = "x",
+  rotationAxis = "y",
   rotationSpeed = 18,
 }: ModelViewerProps) {
   const [ready, setReady] = useState(false);

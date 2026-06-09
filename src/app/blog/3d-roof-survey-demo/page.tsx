@@ -100,6 +100,8 @@ export default function BlogPost3DDemo() {
             src={post.modelUrl}
             alt="Interactive 3D model of Miles & Katie's roof"
             height="600px"
+            rotationAxis="y"
+            rotationSpeed={15}
           />
           <p className="mt-3 text-sm text-gray-400 text-center">
             Interactive 3D model — drag to rotate, pinch to zoom. Generated from 63
