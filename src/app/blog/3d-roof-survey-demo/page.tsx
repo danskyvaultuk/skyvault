@@ -7,7 +7,7 @@ import ModelViewerWrapper from "@/components/ModelViewerWrapper";
 export const metadata = {
   title: "Inside a SkyVault Pro Survey — Interactive 3D Roof Model",
   description:
-    "See how drone capture and OpenDroneMap photogrammetry produces a fully interactive 3D model of any property roof.",
+    "See how drone capture and photogrammetry produces a fully interactive 3D model of any property roof.",
 };
 
 export default function BlogPost3DDemo() {
@@ -25,7 +25,7 @@ export default function BlogPost3DDemo() {
           <Link href="/blog" className="text-sm text-gray-600 hover:text-gray-900">
             ← Blog
           </Link>
-          <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">
+          <Link href="/login" className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900">
             Sign in
           </Link>
           <Link
@@ -56,7 +56,7 @@ export default function BlogPost3DDemo() {
             <span className="text-blue-700">Interactive 3D Roof Model</span>
           </h1>
           <p className="mt-5 text-xl text-gray-500 max-w-2xl mx-auto">
-            See how our drone capture and ODM photogrammetry pipeline produces a
+            See how our drone capture and photogrammetry pipeline produces a
             fully interactive 3D model of any property
           </p>
           <p className="mt-4 text-sm text-gray-400">{post.date}</p>
@@ -84,7 +84,7 @@ export default function BlogPost3DDemo() {
             A SkyVault Pro Survey goes far beyond a standard image upload. A licensed
             drone operator flies two structured passes over the property — the first
             capturing close-range defect shots, the second a photogrammetry grid that
-            feeds directly into OpenDroneMap. The result is a georeferenced orthophoto,
+            feeds directly into our processing pipeline. The result is a georeferenced orthophoto,
             a digital surface model, and — crucially — a fully interactive 3D model
             of the roof you can rotate, zoom, and inspect from any angle.
           </p>
@@ -108,8 +108,7 @@ export default function BlogPost3DDemo() {
             rotationSpeed={15}
           />
           <p className="mt-3 text-sm text-gray-400 text-center">
-            Interactive 3D model — drag to rotate, pinch to zoom. Single-pass test
-            capture processed via OpenDroneMap.
+            Interactive 3D model — drag to rotate, pinch to zoom. Single-pass test capture.
           </p>
         </section>
 
@@ -124,7 +123,6 @@ export default function BlogPost3DDemo() {
                   ["Total images", "63"],
                   ["Flight altitude", "15–25 m AGL"],
                   ["Capture type", "Single-pass photogrammetry (test)"],
-                  ["Processing software", "OpenDroneMap"],
                   ["3D outputs", "Orthophoto, DSM, GLB mesh"],
                   ["Point cloud", "Available (.LAZ)"],
                   ["Location", "UK — residential property"],
@@ -143,13 +141,13 @@ export default function BlogPost3DDemo() {
             <p className="text-sm text-gray-600 leading-relaxed mb-3">
               A production Pro Survey uses two structured passes. Pass 1 captures
               30–60 close oblique shots at 5–10 m altitude — the primary input for
-              Claude Vision defect analysis. The operator works systematically:
+              AI defect analysis. The operator works systematically:
               ridge, front slope, rear slope, gutters, chimney and all flashings.
             </p>
             <p className="text-sm text-gray-600 leading-relaxed mb-3">
               Pass 2 is a photogrammetry grid: nadir (straight-down) shots on a
               structured flight path, plus high and low oblique orbits. These 75–110
-              images feed OpenDroneMap to produce the orthophoto, digital surface
+              images are processed to produce the orthophoto, digital surface
               model, and textured 3D mesh.
             </p>
             <p className="text-sm text-gray-600 leading-relaxed">
@@ -258,14 +256,14 @@ export default function BlogPost3DDemo() {
               },
               {
                 step: "2",
-                title: "ODM Processing",
-                desc: "OpenDroneMap stitches the photogrammetry images into a georeferenced orthophoto, digital surface model, and 3D mesh.",
+                title: "Photogrammetry Processing",
+                desc: "Our pipeline stitches the photogrammetry images into a georeferenced orthophoto, digital surface model, and 3D mesh.",
                 icon: "⚙️",
               },
               {
                 step: "3",
                 title: "AI Analysis + 3D Report",
-                desc: "Claude Vision analyses the defect shots. Findings are combined with spatial data into a full interactive report and PDF.",
+                desc: "Our AI analyses the defect shots. Findings are combined with spatial data into a full interactive report and PDF.",
                 icon: "🤖",
               },
             ].map(({ step, title, desc, icon }) => (

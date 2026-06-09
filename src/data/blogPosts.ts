@@ -17,7 +17,7 @@ export const blogPosts: BlogPost[] = [
     slug: "3d-roof-survey-demo",
     title: "Inside a SkyVault Pro Survey — Interactive 3D Roof Model",
     description:
-      "See how drone capture and photogrammetry produces a fully interactive 3D model of any property roof.",
+      "See how a SkyVault Pro Survey produces a fully interactive 3D model of any property roof.",
     date: "June 2026",
     tags: ["Pro Survey", "Technology"],
     featuredImage: "/images/blog/roof-survey-demo-orthophoto.jpg",
