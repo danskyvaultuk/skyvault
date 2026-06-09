@@ -17,9 +17,10 @@ interface Props {
   height?: string;
   rotationAxis?: "x" | "y" | "xy";
   rotationSpeed?: number;
+  orientation?: string;
 }
 
-export default function ModelViewerWrapper({ src, alt, height = "600px", rotationAxis, rotationSpeed }: Props) {
+export default function ModelViewerWrapper({ src, alt, height = "600px", rotationAxis, rotationSpeed, orientation }: Props) {
   return (
     <Suspense
       fallback={
@@ -31,7 +32,7 @@ export default function ModelViewerWrapper({ src, alt, height = "600px", rotatio
         </div>
       }
     >
-      <ModelViewer src={src} alt={alt} height={height} rotationAxis={rotationAxis} rotationSpeed={rotationSpeed} />
+      <ModelViewer src={src} alt={alt} height={height} rotationAxis={rotationAxis} rotationSpeed={rotationSpeed} orientation={orientation} />
     </Suspense>
   );
 }

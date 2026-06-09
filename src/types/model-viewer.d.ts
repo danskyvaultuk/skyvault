@@ -19,6 +19,7 @@ declare namespace React {
         "camera-orbit"?: string;
         "min-camera-orbit"?: string;
         "max-camera-orbit"?: string;
+        orientation?: string;
         "shadow-intensity"?: string;
         "environment-image"?: string;
         exposure?: string;

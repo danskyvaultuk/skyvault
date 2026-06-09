@@ -17,6 +17,11 @@ interface ModelViewerProps {
   rotationAxis?: RotationAxis;
   /** Degrees per second. Default 18. Negative values reverse direction. */
   rotationSpeed?: number;
+  /**
+   * Correct the model's starting orientation as "Xdeg Ydeg Zdeg".
+   * ODM exports Z-up models; use "-90deg 0deg 0deg" to lay them flat.
+   */
+  orientation?: string;
 }
 
 export default function ModelViewer({
@@ -25,6 +30,7 @@ export default function ModelViewer({
   height = "600px",
   rotationAxis = "y",
   rotationSpeed = 18,
+  orientation,
 }: ModelViewerProps) {
   const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -125,6 +131,7 @@ export default function ModelViewer({
           min-camera-orbit="auto -Infinity auto"
           max-camera-orbit="auto Infinity auto"
           shadow-intensity="1"
+          {...(orientation ? { orientation } : {})}
           style={{ width: "100%", height: "100%" }}
         />
       )}
