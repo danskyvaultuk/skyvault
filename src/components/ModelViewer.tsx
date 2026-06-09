@@ -63,8 +63,6 @@ export default function ModelViewer({
       {/* model-viewer is always rendered once the JS is ready so the
           element exists in the DOM before we attach event listeners */}
       {ready && (
-        // @ts-expect-error — ref on custom elements works in React 19 but TS
-        // doesn't know the ref shape for <model-viewer>; casting via comment
         <model-viewer
           ref={viewerRef}
           src={src}
