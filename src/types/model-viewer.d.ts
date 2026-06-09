@@ -16,6 +16,9 @@ declare namespace React {
         "auto-rotate"?: boolean | "";
         "auto-rotate-delay"?: string;
         "rotation-per-second"?: string;
+        "camera-orbit"?: string;
+        "min-camera-orbit"?: string;
+        "max-camera-orbit"?: string;
         "shadow-intensity"?: string;
         "environment-image"?: string;
         exposure?: string;
