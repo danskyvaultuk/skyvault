@@ -14,6 +14,8 @@ declare namespace React {
         poster?: string;
         "camera-controls"?: boolean | "";
         "auto-rotate"?: boolean | "";
+        "auto-rotate-delay"?: string;
+        "rotation-per-second"?: string;
         "shadow-intensity"?: string;
         "environment-image"?: string;
         exposure?: string;

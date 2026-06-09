@@ -69,6 +69,8 @@ export default function ModelViewer({
           alt={alt}
           camera-controls
           auto-rotate
+          rotation-per-second="20deg"
+          auto-rotate-delay="0"
           shadow-intensity="1"
           style={{ width: "100%", height: "100%" }}
         />
