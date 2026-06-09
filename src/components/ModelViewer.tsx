@@ -71,7 +71,7 @@ export default function ModelViewer({
     let rafId: number;
     let startTime: number | null = null;
     let theta = 0;   // horizontal angle (Y axis)
-    let phi   = 75;  // elevation angle  (X axis)
+    let phi   = 65;  // elevation angle — 65° gives a nice 3/4 view
 
     const animate = (ts: number) => {
       if (!startTime) startTime = ts;
@@ -82,7 +82,7 @@ export default function ModelViewer({
 
         if (rotationAxis === "y") {
           theta = (theta + delta * rotationSpeed) % 360;
-          el.setAttribute("camera-orbit", `${theta}deg 75deg auto`);
+          el.setAttribute("camera-orbit", `${theta}deg 65deg auto`);
         } else if (rotationAxis === "x") {
           phi = (phi + delta * rotationSpeed) % 360;
           el.setAttribute("camera-orbit", `0deg ${phi}deg auto`);
@@ -128,6 +128,7 @@ export default function ModelViewer({
           src={src}
           alt={alt}
           camera-controls
+          camera-orbit="0deg 65deg auto"
           min-camera-orbit="auto -Infinity auto"
           max-camera-orbit="auto Infinity auto"
           shadow-intensity="1"
