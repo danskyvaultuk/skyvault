@@ -11,6 +11,16 @@ output "uploads_bucket_region" {
   value       = aws_s3_bucket.uploads.region
 }
 
+output "public_assets_bucket_name" {
+  description = "Public assets S3 bucket name — used for blog GLB URLs"
+  value       = aws_s3_bucket.public_assets.id
+}
+
+output "public_assets_base_url" {
+  description = "Base URL for public blog assets (no trailing slash)"
+  value       = "https://${aws_s3_bucket.public_assets.id}.s3.eu-west-2.amazonaws.com"
+}
+
 output "app_access_key_id" {
   description = "IAM access key ID — goes into AWS_ACCESS_KEY_ID"
   value       = aws_iam_access_key.skyvault_app.id

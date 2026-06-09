@@ -627,6 +627,7 @@ User (roofer) ──  Subscription
 - [ ] Rate limiting on analyse route — **NOT DONE**
 - [ ] `prisma/seed.ts` — demo data — **NOT BUILT**
 - [ ] OWASP security review — **NOT DONE**
+- [ ] Rename `src/lib/r2.ts` → `src/lib/s3.ts` and update all imports (cosmetic — file uses AWS SDK but retains old Cloudflare R2 name)
 
 ---
 

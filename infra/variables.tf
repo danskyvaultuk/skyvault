@@ -16,6 +16,12 @@ variable "state_bucket_name" {
   default     = "skyvault-tf-state-786971594750"
 }
 
+variable "public_assets_bucket_name" {
+  description = "S3 bucket for publicly readable blog assets (GLB models, orthophotos)"
+  type        = string
+  default     = "skyvault-public-assets-786971594750"
+}
+
 variable "app_url" {
   description = "App origin allowed to make presigned PUT requests (CORS)"
   type        = string

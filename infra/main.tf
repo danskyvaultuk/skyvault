@@ -46,6 +46,54 @@ resource "aws_s3_bucket_cors_configuration" "uploads" {
   }
 }
 
+# ── Public assets bucket ──────────────────────────────────────────────────────
+# Blog models, orthophotos, and other public-facing static assets.
+# Only the blog/ prefix is world-readable — no private survey data goes here.
+
+resource "aws_s3_bucket" "public_assets" {
+  bucket = var.public_assets_bucket_name
+}
+
+# Public access is intentional — this bucket serves blog content
+resource "aws_s3_bucket_public_access_block" "public_assets" {
+  bucket                  = aws_s3_bucket.public_assets.id
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
+# Bucket policy: allow anonymous GET on blog/* only
+resource "aws_s3_bucket_policy" "public_assets" {
+  bucket     = aws_s3_bucket.public_assets.id
+  depends_on = [aws_s3_bucket_public_access_block.public_assets]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowPublicReadBlogPrefix"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.public_assets.arn}/blog/*"
+      }
+    ]
+  })
+}
+
+# CORS: allow model-viewer to fetch the GLB from any origin
+resource "aws_s3_bucket_cors_configuration" "public_assets" {
+  bucket = aws_s3_bucket.public_assets.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET"]
+    allowed_origins = ["*"]
+    max_age_seconds = 86400
+  }
+}
+
 # ── IAM: app user + scoped policy ─────────────────────────────────────────────
 # A dedicated IAM user for the app — only has access to the uploads bucket.
 # Never use your personal AWS credentials in the app.
