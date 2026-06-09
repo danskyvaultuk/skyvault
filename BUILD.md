@@ -50,7 +50,7 @@ SkyVault is a three-sided marketplace:
 | Framework | Next.js 16.2.6 App Router (TypeScript) | Single codebase for all portals + API |
 | Database | Neon (serverless Postgres) + Prisma ORM 6.x | Serverless-native, connection pooling via pgbouncer |
 | Auth | Auth.js v5 — Google OAuth + Resend magic link | `allowDangerousEmailAccountLinking: true` on Google provider |
-| File Storage | Cloudflare R2 (S3-compatible) | No egress fees, presigned URLs, 15-min upload TTL |
+| File Storage | AWS S3 (eu-west-2) | Presigned URLs, 15-min upload TTL; lib file named r2.ts but uses AWS SDK |
 | AI | Anthropic `claude-sonnet-4-5` (vision) | Structured JSON output, Zod-validated, Sharp image resizing |
 | PDF | @react-pdf/renderer | Pure JS, serverless safe, includes photo annex page |
 | Email | Resend | From: `noreply@skyvaultuk.com` (verified domain) |
@@ -98,10 +98,10 @@ AUTH_RESEND_KEY=""          # Resend API key — used by Auth.js for magic link 
 NEXTAUTH_URL="http://localhost:3000"
 
 # ── Cloudflare R2 ──────────────────────────────────────────────────────────
-R2_ACCOUNT_ID=""
-R2_ACCESS_KEY_ID=""
-R2_SECRET_ACCESS_KEY=""
-R2_BUCKET_NAME="skyvault-uploads"
+AWS_REGION="eu-west-2"
+AWS_ACCESS_KEY_ID=""
+AWS_SECRET_ACCESS_KEY=""
+AWS_S3_BUCKET_NAME="skyvault-uploads-786971594750"
 
 # ── Anthropic ──────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY="sk-ant-..."
@@ -165,10 +165,10 @@ npx prisma studio
    - `https://skyvaultuk.com/api/auth/callback/google` (when custom domain is live)
 4. Copy Client ID → `AUTH_GOOGLE_ID` and Client Secret → `AUTH_GOOGLE_SECRET`
 
-### Cloudflare R2
+### AWS S3
 
-1. Cloudflare dashboard → R2 → Create bucket → name: `skyvault-uploads`
-2. R2 → Manage R2 API Tokens → Create token (Object Read & Write)
+1. Bucket: `skyvault-uploads-786971594750` in `eu-west-2`
+2. IAM user with S3 read/write permissions → copy Access Key + Secret → `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`
 3. Set CORS policy on the bucket (required for browser direct uploads):
 
 ```json
@@ -181,6 +181,8 @@ npx prisma studio
   }
 ]
 ```
+
+Note: `src/lib/r2.ts` is named after the original Cloudflare R2 spec but uses the AWS SDK and S3 env vars.
 
 ### Stripe
 
@@ -670,7 +672,7 @@ All variables from `.env.local` except:
   - New live webhook endpoint + signing secret
   - Live `STRIPE_SECRET_KEY`, `STRIPE_BASIC_PRICE_ID`, `STRIPE_PRO_PRICE_ID`
   - Live `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-- [ ] Update R2 CORS policy to include `https://skyvaultuk.com`
+- [ ] Update AWS S3 CORS policy to include `https://skyvaultuk.com`
 - [ ] Redeploy after all env var changes
 
 ---
@@ -724,11 +726,11 @@ All variables from `.env.local` except:
 
 ### Why images bypass the Next.js server
 
-Browser uploads go **directly to Cloudflare R2** via presigned URLs. The server generates the URL (15-min TTL) but never touches the bytes. No 4.5MB Vercel body limit, no compute cost on upload.
+Browser uploads go **directly to AWS S3** via presigned URLs. The server generates the URL (15-min TTL) but never touches the bytes. No 4.5MB Vercel body limit, no compute cost on upload.
 
 ### Why Claude gets base64 images, not URLs
 
-R2 objects are private. Presigned URLs passed to Claude are unreliable (may expire mid-request). The pipeline fetches each image server-side, resizes with Sharp (max 1568px, JPEG, ~500KB), encodes to base64, and passes as `image` blocks. 10 images ≈ 5MB payload — well within Claude's limits.
+S3 objects are private. Presigned URLs passed to Claude are unreliable (may expire mid-request). The pipeline fetches each image server-side, resizes with Sharp (max 1568px, JPEG, ~500KB), encodes to base64, and passes as `image` blocks. 10 images ≈ 5MB payload — well within Claude's limits.
 
 ### Why `waitUntil` is used on the drone-jobs route
 
