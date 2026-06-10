@@ -26,6 +26,7 @@ export default auth((req) => {
 
   const isPublic =
     pathname === "/" ||
+    pathname.startsWith("/blog") ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
     pathname.startsWith("/verify") ||
