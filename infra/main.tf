@@ -33,14 +33,16 @@ resource "aws_s3_bucket_public_access_block" "uploads" {
   restrict_public_buckets = true
 }
 
-# CORS: allows the browser to PUT files directly to S3 using presigned URLs
+# CORS: allows the browser to PUT files directly to S3 using presigned URLs.
+# Security is enforced by the presigned URL itself (time-limited, scoped to one key)
+# so allowing all origins is safe and avoids breaking new domains/previews.
 resource "aws_s3_bucket_cors_configuration" "uploads" {
   bucket = aws_s3_bucket.uploads.id
 
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "PUT"]
-    allowed_origins = [var.app_url]
+    allowed_origins = ["*"]
     expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
