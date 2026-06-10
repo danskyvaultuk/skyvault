@@ -25,7 +25,7 @@ export default function BlogPost3DDemo() {
           <Link href="/blog" className="text-sm text-gray-600 hover:text-gray-900">
             ← Blog
           </Link>
-          <Link href="/login" className="hidden sm:inline text-sm text-gray-600 hover:text-gray-900">
+          <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">
             Sign in
           </Link>
           <Link
