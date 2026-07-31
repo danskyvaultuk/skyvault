@@ -37,11 +37,15 @@ export async function distributeLeads(
     },
   });
 
-  // Find all roofers with an active subscription — no postcode filter for now
+  const outward = outwardCode(propertyPostcode);
+
+  // Only roofers whose postcode is in the same outward code area (e.g. "SW1A")
   const eligibleRoofers = await prisma.user.findMany({
     where: {
       role: "roofer",
+      verified: true,
       subscription: { status: "active" },
+      postcode: { startsWith: outward, mode: "insensitive" },
     },
     include: { subscription: true },
   });
