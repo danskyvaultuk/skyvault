@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import type { SurveyStatus } from "@prisma/client";
+import type { SurveyStatus, Prisma } from "@prisma/client";
+import { RoofContextSchema, sanitizeRoofContext } from "@/lib/roofContext";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -44,10 +45,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const body = await req.json();
   // Allow resetting a failed survey back to draft for retry
-  const data: { notes?: string; status?: SurveyStatus } = {};
+  const data: { notes?: string; status?: SurveyStatus; roofContext?: Prisma.InputJsonValue } = {};
   // Allow updating notes freely while the survey is still in draft
   if (body.notes !== undefined && survey.status === "draft") data.notes = body.notes;
   if (body.status === "draft" && survey.status === "failed") data.status = "draft";
+
+  // Opt-in roof Q&A — same draft-only window as notes. Every field is optional;
+  // an empty object is valid (customer skipped everything).
+  if (body.roofContext !== undefined && survey.status === "draft") {
+    const parsed = RoofContextSchema.safeParse(body.roofContext);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+    data.roofContext = sanitizeRoofContext(parsed.data);
+  }
 
   const updated = await prisma.survey.update({
     where: { id },

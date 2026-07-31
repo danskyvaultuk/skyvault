@@ -158,14 +158,15 @@ model Property {
 }
 
 model Survey {
-  id         String       @id @default(cuid())
-  propertyId String
-  customerId String
-  type       SurveyType
-  status     SurveyStatus @default(draft)
-  notes      String?      @db.Text
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id          String       @id @default(cuid())
+  propertyId  String
+  customerId  String
+  type        SurveyType
+  status      SurveyStatus @default(draft)
+  notes       String?      @db.Text
+  roofContext Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   customer User      @relation("CustomerSurveys", fields: [customerId], references: [id], onDelete: Cascade)

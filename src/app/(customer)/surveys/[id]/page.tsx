@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ImageUploader } from "@/components/surveys/image-uploader";
+import { RoofContextCard, type RoofContext } from "@/components/surveys/roof-context-card";
 import { DroneBookingPanel } from "./drone-booking";
 
 interface DroneJob {
@@ -16,6 +17,7 @@ interface Survey {
   status: string;
   type: string;
   notes?: string;
+  roofContext?: RoofContext | null;
   property: { address: string; postcode: string };
   images: { id: string }[];
   droneJob: DroneJob | null;
@@ -214,6 +216,15 @@ export default function SurveyPage() {
               <p className="text-2xl font-bold text-gray-400">10</p>
             </div>
           </div>
+
+          {survey.status === "draft" && (
+            <RoofContextCard
+              surveyId={id}
+              postcode={survey.property.postcode}
+              initial={survey.roofContext}
+              onSaved={(ctx) => setSurvey((prev) => (prev ? { ...prev, roofContext: ctx } : prev))}
+            />
+          )}
 
           {survey.status === "draft" && (
             <div className="mb-6">

@@ -4,6 +4,7 @@ import { analyzeRoof } from "@/lib/claude";
 import { renderReportPDF } from "@/lib/pdf";
 import { distributeLeads } from "@/lib/leads";
 import { notifyCustomerReportReady } from "@/lib/resend";
+import { RoofContextSchema } from "@/lib/roofContext";
 import sharp from "sharp";
 
 // Claude Vision limit is 5MB per image.
@@ -74,10 +75,17 @@ export async function runAnalysisPipeline(surveyId: string) {
 
     // ── Step 4: Call Claude Vision ─────────────────────────────────────────
     console.log("[pipeline] Sending images to Claude…");
+    // survey.roofContext is untyped JSON from the DB — validate before use so a
+    // malformed/legacy value can never reach the prompt builder or crash the pipeline.
+    const roofContext = RoofContextSchema.safeParse(survey.roofContext).success
+      ? RoofContextSchema.parse(survey.roofContext)
+      : null;
+
     const analysis = await analyzeRoof(
       imageData.map((d) => d.base64),
       imageData.map((d) => d.mimeType),
-      survey.notes ?? undefined
+      survey.notes ?? undefined,
+      roofContext
     );
     console.log(`[pipeline] Got score: ${analysis.condition_score}/10`);
 
