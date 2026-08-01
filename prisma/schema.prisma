@@ -39,6 +39,14 @@ enum ImageValidationStatus {
   invalid
 }
 
+enum RoofPart {
+  front
+  back
+  side
+  chimney
+  close_up
+}
+
 enum ReportStatus {
   draft
   published
@@ -191,6 +199,10 @@ model Image {
   validationStatus ImageValidationStatus @default(pending)
   validationNotes  String?
   sortOrder        Int                   @default(0)
+  // Per-photo tagging (SV-046) — optional, set post-upload, consumed by SV-048.
+  roofPart         RoofPart?
+  captureMethod    String?
+  taggedAt         DateTime?
   createdAt        DateTime              @default(now())
 
   survey     Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)

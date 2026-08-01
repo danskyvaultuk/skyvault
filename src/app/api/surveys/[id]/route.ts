@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { SurveyStatus, Prisma } from "@prisma/client";
 import { RoofContextSchema, sanitizeRoofContext } from "@/lib/roofContext";
+import { getPresignedReadUrl } from "@/lib/r2";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -28,7 +29,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  return NextResponse.json(survey);
+  // Attach a viewable presigned URL per image — needed for the post-upload
+  // tagging grid to render thumbnails, including on a reopened survey where
+  // there's no local File object to preview from.
+  const imageUrls = await Promise.all(
+    survey.images.map((img) => getPresignedReadUrl(img.s3Key, 3600))
+  );
+  const images = survey.images.map((img, i) => ({ ...img, url: imageUrls[i] }));
+
+  return NextResponse.json({ ...survey, images });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

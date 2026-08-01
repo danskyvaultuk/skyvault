@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ImageUploader } from "@/components/surveys/image-uploader";
 import { RoofContextCard, type RoofContext } from "@/components/surveys/roof-context-card";
+import { PhotoTagGrid, type TaggablePhoto } from "@/components/surveys/photo-tag-grid";
 import { DroneBookingPanel } from "./drone-booking";
 
 interface DroneJob {
@@ -19,7 +20,7 @@ interface Survey {
   notes?: string;
   roofContext?: RoofContext | null;
   property: { address: string; postcode: string };
-  images: { id: string }[];
+  images: TaggablePhoto[];
   droneJob: DroneJob | null;
 }
 
@@ -53,18 +54,25 @@ export default function SurveyPage() {
   const [notes, setNotes] = useState("");
   const [notesSaved, setNotesSaved] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/surveys/${id}`)
+  function fetchSurvey() {
+    return fetch(`/api/surveys/${id}`)
       .then((r) => r.json())
       .then((data) => {
         setSurvey(data);
         setImageCount(data.images?.length ?? 0);
         setNotes(data.notes ?? "");
+        return data;
       });
+  }
+
+  useEffect(() => {
+    fetchSurvey();
   }, [id]);
 
-  function handleUploadComplete(count: number) {
-    setImageCount((prev) => prev + count);
+  function handleUploadComplete() {
+    // Refetch rather than just bumping the count — the tag grid needs the
+    // fresh image list (presigned URLs, ids) for the photos that just landed.
+    fetchSurvey();
   }
 
   async function saveNotes() {
@@ -140,6 +148,10 @@ export default function SurveyPage() {
           )}
         </div>
       </div>
+
+      {/* Per-photo tagging — appears once photos exist, any status, either flow.
+          Entirely optional: skipping tagging never blocks analysis or report viewing. */}
+      {survey.images.length > 0 && <PhotoTagGrid photos={survey.images} />}
 
       {/* ── DRONE CAPTURE FLOW ─────────────────────────────────────────── */}
       {isDrone && (
