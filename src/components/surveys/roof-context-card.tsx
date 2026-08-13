@@ -31,9 +31,12 @@ interface Props {
   postcode: string;
   initial?: RoofContext | null;
   onSaved?: (context: RoofContext) => void;
+  /** Shown as a numbered badge next to the heading when this card is one step
+   * in a guided upload → tag → details flow. Omit to render without a number. */
+  stepNumber?: number;
 }
 
-export function RoofContextCard({ surveyId, postcode, initial, onSaved }: Props) {
+export function RoofContextCard({ surveyId, postcode, initial, onSaved, stepNumber }: Props) {
   // Once the customer has answered anything (or explicitly skipped), the card starts
   // collapsed — "asked once per survey" means once ever, not once per page load.
   const [expanded, setExpanded] = useState(!initial);
@@ -85,7 +88,14 @@ export function RoofContextCard({ surveyId, postcode, initial, onSaved }: Props)
   return (
     <div className="bg-white border rounded-xl p-6 mb-6">
       <div className="flex items-start justify-between mb-1">
-        <h2 className="text-base font-semibold text-gray-900">Tell us about the roof</h2>
+        <div className="flex items-center gap-2">
+          {stepNumber !== undefined && (
+            <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+              {stepNumber}
+            </span>
+          )}
+          <h2 className="text-base font-semibold text-gray-900">Tell us about the roof</h2>
+        </div>
         {!dismissed && (
           <button
             type="button"

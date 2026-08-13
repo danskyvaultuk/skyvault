@@ -69,11 +69,10 @@ export function PhotoTagGrid({ photos }: Props) {
   if (photos.length === 0) return null;
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-gray-700">Tag your photos</h3>
-        <span className="text-xs text-gray-400">Optional — tap a photo to label it</span>
-      </div>
+    <div>
+      <p className="text-sm text-gray-500 mb-3">
+        Optional — tap a photo to label which part of the roof it shows.
+      </p>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
         {photos.map((photo) => {

@@ -149,10 +149,6 @@ export default function SurveyPage() {
         </div>
       </div>
 
-      {/* Per-photo tagging — appears once photos exist, any status, either flow.
-          Entirely optional: skipping tagging never blocks analysis or report viewing. */}
-      {survey.images.length > 0 && <PhotoTagGrid photos={survey.images} />}
-
       {/* ── DRONE CAPTURE FLOW ─────────────────────────────────────────── */}
       {isDrone && (
         <>
@@ -198,6 +194,7 @@ export default function SurveyPage() {
                   Your drone operator has completed the capture. Run the AI analysis to get your report.
                 </p>
               </div>
+              {survey.images.length > 0 && <PhotoTagGrid photos={survey.images} />}
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                   {error}
@@ -229,18 +226,13 @@ export default function SurveyPage() {
             </div>
           </div>
 
-          {survey.status === "draft" && (
-            <RoofContextCard
-              surveyId={id}
-              postcode={survey.property.postcode}
-              initial={survey.roofContext}
-              onSaved={(ctx) => setSurvey((prev) => (prev ? { ...prev, roofContext: ctx } : prev))}
-            />
-          )}
-
+          {/* Step 1 — upload. Always first: nothing else is useful until photos exist. */}
           {survey.status === "draft" && (
             <div className="mb-6">
-              <h2 className="text-base font-semibold text-gray-900 mb-3">Upload roof images</h2>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">1</span>
+                <h2 className="text-base font-semibold text-gray-900">Upload roof images</h2>
+              </div>
               <p className="text-sm text-gray-500 mb-4">
                 Upload clear photos of the roof from different angles. Include close-ups of any
                 areas you&apos;re concerned about.
@@ -249,8 +241,33 @@ export default function SurveyPage() {
             </div>
           )}
 
+          {/* Step 2 — tag. Only makes sense once photos exist. Entirely optional —
+              skipping never blocks analysis. */}
+          {survey.images.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">2</span>
+                <h2 className="text-base font-semibold text-gray-900">Tag your photos</h2>
+              </div>
+              <PhotoTagGrid photos={survey.images} />
+            </div>
+          )}
+
+          {/* Step 3 — optional roof Q&A. Shown once photos exist, so the flow reads as
+              upload → tag → tell us more → send to AI, rather than a wall of questions
+              before the user has done anything. */}
+          {survey.status === "draft" && survey.images.length > 0 && (
+            <RoofContextCard
+              stepNumber={3}
+              surveyId={id}
+              postcode={survey.property.postcode}
+              initial={survey.roofContext}
+              onSaved={(ctx) => setSurvey((prev) => (prev ? { ...prev, roofContext: ctx } : prev))}
+            />
+          )}
+
           {/* Customer concerns — saved to notes, passed to Claude at analysis time */}
-          {survey.status === "draft" && (
+          {survey.status === "draft" && survey.images.length > 0 && (
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1">
                 <label className="text-sm font-medium text-gray-700">
