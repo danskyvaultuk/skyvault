@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // tagging (or skipping it) must never affect report generation. SV-048 (not
 // built yet) is the ticket that will make the pipeline actually *read* tags —
 // until then, this test proves the pipeline is fully indifferent to their
-// presence, value, or absence.
+// presence, value, or absence. It also covers the report-content addition
+// (customer notes + roof Q&A now flow into the PDF).
 
 const mockSurveyFindUnique = vi.fn();
 const mockSurveyUpdate = vi.fn();
@@ -71,10 +72,14 @@ const VALID_ANALYSIS = {
   surveyor_notes: "Looks fine.",
 };
 
-function makeSurvey(images: Array<Partial<Record<string, unknown>>>) {
+function makeSurvey(
+  images: Array<Partial<Record<string, unknown>>>,
+  overrides: Partial<Record<string, unknown>> = {}
+) {
   return {
     id: "survey-1",
     notes: null,
+    roofContext: null,
     property: { address: "1 Test St", postcode: "SW1A 1AA" },
     customer: { email: "a@b.com", name: "Test" },
     images: images.map((img, i) => ({
@@ -82,11 +87,13 @@ function makeSurvey(images: Array<Partial<Record<string, unknown>>>) {
       s3Key: `surveys/survey-1/images/${i}.jpg`,
       originalFilename: `${i}.jpg`,
       sortOrder: i,
-      roofPart: null,
+      roofParts: [],
+      aspect: null,
       captureMethod: null,
       taggedAt: null,
       ...img,
     })),
+    ...overrides,
   };
 }
 
@@ -117,12 +124,12 @@ describe("runAnalysisPipeline — tag-indifference (SV-046 acceptance criterion)
     );
   });
 
-  it("completes successfully with a mix of tagged and untagged photos", async () => {
+  it("completes successfully with a mix of tagged and untagged photos, single and multi-tagged", async () => {
     mockSurveyFindUnique.mockResolvedValue(
       makeSurvey([
-        { roofPart: "front", captureMethod: "drone" },
-        { roofPart: null },
-        { roofPart: "chimney" },
+        { roofParts: ["front"], captureMethod: "drone" },
+        { roofParts: [] },
+        { roofParts: ["chimney", "close_up"], aspect: "north" },
       ])
     );
 
@@ -133,9 +140,9 @@ describe("runAnalysisPipeline — tag-indifference (SV-046 acceptance criterion)
   it("completes successfully when every photo is tagged", async () => {
     mockSurveyFindUnique.mockResolvedValue(
       makeSurvey([
-        { roofPart: "front" },
-        { roofPart: "back" },
-        { roofPart: "side" },
+        { roofParts: ["front"] },
+        { roofParts: ["back"] },
+        { roofParts: ["side", "ridge"], aspect: "south" },
       ])
     );
 
@@ -145,24 +152,53 @@ describe("runAnalysisPipeline — tag-indifference (SV-046 acceptance criterion)
 
   it("never passes tag data to analyzeRoof — that wiring is SV-048, not this ticket", async () => {
     mockSurveyFindUnique.mockResolvedValue(
-      makeSurvey([{ roofPart: "front", captureMethod: "drone" }])
+      makeSurvey([{ roofParts: ["front"], aspect: "north", captureMethod: "drone" }])
     );
 
     await runAnalysisPipeline("survey-1");
 
     const callArgs = mockAnalyzeRoof.mock.calls[0];
     const serialized = JSON.stringify(callArgs);
-    expect(serialized).not.toContain("roofPart");
+    expect(serialized).not.toContain("roofParts");
+    expect(serialized).not.toContain("aspect");
     expect(serialized).not.toContain("captureMethod");
   });
 
   it("marks the survey failed (not blocked pre-emptively) if the pipeline throws, regardless of tags", async () => {
-    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{ roofPart: "front" }]));
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{ roofParts: ["front"] }]));
     mockAnalyzeRoof.mockRejectedValue(new Error("Claude is down"));
 
     await expect(runAnalysisPipeline("survey-1")).rejects.toThrow("Claude is down");
     expect(mockSurveyUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: "failed" } })
     );
+  });
+});
+
+describe("runAnalysisPipeline — customer notes & roof Q&A reach the PDF", () => {
+  it("passes survey.notes and the validated roofContext into renderReportPDF", async () => {
+    mockSurveyFindUnique.mockResolvedValue(
+      makeSurvey([{}], {
+        notes: "Worried about the chimney flashing.",
+        roofContext: { material: "slate", ageBand: "15+" },
+      })
+    );
+
+    await runAnalysisPipeline("survey-1");
+
+    const call = mockRenderReportPDF.mock.calls[0];
+    // (analysis, address, postcode, imageBase64s, customerNotes, roofContext)
+    expect(call[4]).toBe("Worried about the chimney flashing.");
+    expect(call[5]).toEqual({ material: "slate", ageBand: "15+" });
+  });
+
+  it("passes null/undefined through cleanly when nothing was answered", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}], { notes: null, roofContext: null }));
+
+    await runAnalysisPipeline("survey-1");
+
+    const call = mockRenderReportPDF.mock.calls[0];
+    expect(call[4]).toBeNull();
+    expect(call[5]).toBeNull();
   });
 });

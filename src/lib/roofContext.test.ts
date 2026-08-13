@@ -3,6 +3,7 @@ import {
   RoofContextSchema,
   sanitizeRoofContext,
   buildRoofContextPromptBlock,
+  roofContextSummaryLines,
 } from "./roofContext";
 
 describe("RoofContextSchema", () => {
@@ -90,5 +91,46 @@ describe("buildRoofContextPromptBlock", () => {
     expect(block).toContain("pitched");
     expect(block).toContain("4 slope(s)");
     expect(block).toContain("Damp patch in loft");
+  });
+});
+
+describe("roofContextSummaryLines — customer-facing report/PDF display", () => {
+  it("returns [] when context is null, undefined, or empty", () => {
+    expect(roofContextSummaryLines(null)).toEqual([]);
+    expect(roofContextSummaryLines(undefined)).toEqual([]);
+    expect(roofContextSummaryLines({})).toEqual([]);
+  });
+
+  it("includes only the fields the customer actually answered", () => {
+    const lines = roofContextSummaryLines({ material: "felt" });
+    expect(lines).toEqual([{ label: "Material", value: "Felt" }]);
+  });
+
+  it("formats a fully answered context with human-readable labels", () => {
+    const lines = roofContextSummaryLines({
+      ageBand: "5-15",
+      ageNote: "Re-tiled front slope in 2019",
+      material: "tile",
+      shape: "pitched",
+      slopeCount: 2,
+      problemAreas: "Leak near chimney",
+    });
+
+    expect(lines).toEqual([
+      { label: "Roof age", value: "5–15 years — Re-tiled front slope in 2019" },
+      { label: "Material", value: "Tile" },
+      { label: "Shape", value: "Pitched, 2 slope(s)" },
+      { label: "Known problem areas", value: "Leak near chimney" },
+    ]);
+  });
+
+  it("omits the age note dash when no note was given", () => {
+    const lines = roofContextSummaryLines({ ageBand: "15+" });
+    expect(lines).toEqual([{ label: "Roof age", value: "15+ years" }]);
+  });
+
+  it("labels a flat roof correctly", () => {
+    const lines = roofContextSummaryLines({ shape: "flat" });
+    expect(lines).toEqual([{ label: "Shape", value: "Flat" }]);
   });
 });

@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPresignedReadUrl } from "@/lib/r2";
+import { roofContextSummaryLines, type RoofContext } from "@/lib/roofContext";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -60,6 +61,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     type: string; severity: string; description: string; image_index: number;
   }>);
   const recommendations = report.recommendations as string[];
+  const roofContextLines = roofContextSummaryLines(survey.roofContext as RoofContext | null);
 
   // Generate presigned URLs for all survey images (valid 1 hour)
   const imageUrls = await Promise.all(
@@ -124,6 +126,30 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <p className="text-sm text-blue-700">
             {(report.rawAiResponse as { surveyor_notes: string }).surveyor_notes}
           </p>
+        </div>
+      )}
+
+      {/* What you told us — customer concerns + roof Q&A, both optional and
+          shown only when the customer actually filled something in */}
+      {(survey.notes || roofContextLines.length > 0) && (
+        <div className="bg-white border rounded-xl px-5 py-4 mb-6">
+          <h2 className="font-semibold text-gray-900 mb-3">What you told us</h2>
+          {survey.notes && (
+            <div className="mb-3">
+              <p className="text-xs font-medium text-gray-500 mb-1">Concerns you mentioned</p>
+              <p className="text-sm text-gray-700">{survey.notes}</p>
+            </div>
+          )}
+          {roofContextLines.length > 0 && (
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+              {roofContextLines.map(({ label, value }) => (
+                <div key={label}>
+                  <dt className="text-xs font-medium text-gray-500">{label}</dt>
+                  <dd className="text-sm text-gray-700">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
       )}
 

@@ -45,6 +45,18 @@ enum RoofPart {
   side
   chimney
   close_up
+  ridge
+  valley
+  gutter
+  flashing
+  overview
+}
+
+enum Aspect {
+  north
+  south
+  east
+  west
 }
 
 enum ReportStatus {
@@ -200,7 +212,10 @@ model Image {
   validationNotes  String?
   sortOrder        Int                   @default(0)
   // Per-photo tagging (SV-046) — optional, set post-upload, consumed by SV-048.
-  roofPart         RoofPart?
+  // roofParts: multiple tags per photo (e.g. front + chimney). aspect: which
+  // compass direction the roof section faces — independent of roofParts.
+  roofParts        RoofPart[]            @default([])
+  aspect           Aspect?
   captureMethod    String?
   taggedAt         DateTime?
   createdAt        DateTime              @default(now())

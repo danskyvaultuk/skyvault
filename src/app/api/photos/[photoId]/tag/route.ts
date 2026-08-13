@@ -27,17 +27,26 @@ async function authorizeImage(photoId: string): Promise<AuthResult> {
   return { ok: true, imageId: image.id };
 }
 
-function toPhotoTag(image: { id: string; roofPart: string | null; captureMethod: string | null; taggedAt: Date | null }): PhotoTag {
+function toPhotoTag(image: {
+  id: string;
+  roofParts: string[];
+  aspect: string | null;
+  captureMethod: string | null;
+  taggedAt: Date | null;
+}): PhotoTag {
   return {
     photoId: image.id,
-    roofPart: image.roofPart as PhotoTag["roofPart"],
+    roofParts: image.roofParts as PhotoTag["roofParts"],
+    aspect: image.aspect as PhotoTag["aspect"],
     captureMethod: image.captureMethod,
     taggedAt: image.taggedAt ? image.taggedAt.toISOString() : null,
   };
 }
 
 // Tap-to-tag a thumbnail. Idempotent — repeat calls with the same body produce
-// the same end state. roofPart: null (with or without captureMethod) untags.
+// the same end state. Each call replaces the full tag state (roofParts, aspect,
+// captureMethod) — the client always sends the complete current selection, not
+// a delta. roofParts: [] and aspect: null (or omitted) together untag the photo.
 // Never gated on survey status — retagging after report generation is allowed.
 export async function PATCH(req: Request, { params }: { params: Promise<{ photoId: string }> }) {
   const { photoId } = await params;
@@ -48,21 +57,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ photoI
   const parsed = PhotoTagSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { roofPart, captureMethod } = parsed.data;
+  const { roofParts, aspect, captureMethod } = parsed.data;
+  const hasAnyTag = roofParts.length > 0 || !!aspect;
 
   const updated = await prisma.image.update({
     where: { id: authResult.imageId },
     data: {
-      roofPart,
+      roofParts,
+      aspect: aspect ?? null,
       captureMethod: captureMethod ?? null,
-      taggedAt: roofPart ? new Date() : null,
+      taggedAt: hasAnyTag ? new Date() : null,
     },
   });
 
   return NextResponse.json(toPhotoTag(updated));
 }
 
-// Explicit untag path, equivalent to PATCH { roofPart: null }.
+// Explicit untag path, equivalent to PATCH { roofParts: [], aspect: null }.
 export async function DELETE(req: Request, { params }: { params: Promise<{ photoId: string }> }) {
   const { photoId } = await params;
   const authResult = await authorizeImage(photoId);
@@ -70,7 +81,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ photo
 
   const updated = await prisma.image.update({
     where: { id: authResult.imageId },
-    data: { roofPart: null, captureMethod: null, taggedAt: null },
+    data: { roofParts: [], aspect: null, captureMethod: null, taggedAt: null },
   });
 
   return NextResponse.json(toPhotoTag(updated));

@@ -72,3 +72,53 @@ export function buildRoofContextPromptBlock(context: RoofContext | null | undefi
 
   return lines.join("\n");
 }
+
+const AGE_DISPLAY_LABELS: Record<string, string> = {
+  "0-5": "0–5 years",
+  "5-15": "5–15 years",
+  "15+": "15+ years",
+  not_sure: "Not sure",
+};
+
+const MATERIAL_DISPLAY_LABELS: Record<string, string> = {
+  slate: "Slate",
+  tile: "Tile",
+  felt: "Felt",
+  shingle: "Shingle",
+  not_sure: "Not sure",
+};
+
+/**
+ * Human-readable "label: value" pairs for whatever the customer actually
+ * answered — used to display the roof Q&A on the report page and in the PDF.
+ * Returns [] when context is null/undefined/empty (fully skipped), so callers
+ * can render nothing rather than an empty section.
+ */
+export function roofContextSummaryLines(
+  context: RoofContext | null | undefined
+): { label: string; value: string }[] {
+  if (!context) return [];
+
+  const lines: { label: string; value: string }[] = [];
+  if (context.ageBand) {
+    lines.push({
+      label: "Roof age",
+      value: AGE_DISPLAY_LABELS[context.ageBand] + (context.ageNote ? ` — ${context.ageNote}` : ""),
+    });
+  }
+  if (context.material) {
+    lines.push({ label: "Material", value: MATERIAL_DISPLAY_LABELS[context.material] });
+  }
+  if (context.shape) {
+    const shapeLabel = context.shape === "flat" ? "Flat" : "Pitched";
+    lines.push({
+      label: "Shape",
+      value: shapeLabel + (context.slopeCount ? `, ${context.slopeCount} slope(s)` : ""),
+    });
+  }
+  if (context.problemAreas) {
+    lines.push({ label: "Known problem areas", value: context.problemAreas });
+  }
+
+  return lines;
+}

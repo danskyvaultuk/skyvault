@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from "@react-pdf/renderer";
 import React from "react";
 import type { RoofAnalysis } from "./claude";
+import { roofContextSummaryLines, type RoofContext } from "./roofContext";
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
@@ -90,13 +91,19 @@ function ReportDocument({
   postcode,
   generatedAt,
   imageBase64s,
+  customerNotes,
+  roofContext,
 }: {
   analysis: RoofAnalysis;
   address: string;
   postcode: string;
   generatedAt: string;
   imageBase64s?: string[];
+  customerNotes?: string | null;
+  roofContext?: RoofContext | null;
 }) {
+  const roofContextLines = roofContextSummaryLines(roofContext);
+  const hasCustomerInfo = !!customerNotes || roofContextLines.length > 0;
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -147,6 +154,29 @@ function ReportDocument({
             {analysis.surveyor_notes}
           </Text>
         </View>
+
+        {/* What the customer told us — concerns + roof Q&A, both optional */}
+        {hasCustomerInfo && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>What you told us</Text>
+            {customerNotes && (
+              <View style={{ marginBottom: 8 }}>
+                <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", color: "#4b5563", marginBottom: 2 }}>
+                  Concerns you mentioned
+                </Text>
+                <Text style={{ fontSize: 10, color: "#374151", lineHeight: 1.4 }}>{customerNotes}</Text>
+              </View>
+            )}
+            {roofContextLines.map(({ label, value }) => (
+              <View key={label} style={{ flexDirection: "row", marginBottom: 3 }}>
+                <Text style={{ width: 130, fontSize: 9, fontFamily: "Helvetica-Bold", color: "#4b5563" }}>
+                  {label}
+                </Text>
+                <Text style={{ flex: 1, fontSize: 9, color: "#374151" }}>{value}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Defects */}
         {analysis.defects.length > 0 && (
@@ -232,14 +262,16 @@ export async function renderReportPDF(
   analysis: RoofAnalysis,
   address: string,
   postcode: string,
-  imageBase64s?: string[]
+  imageBase64s?: string[],
+  customerNotes?: string | null,
+  roofContext?: RoofContext | null
 ): Promise<Buffer> {
   const generatedAt = new Date().toLocaleDateString("en-GB", {
     day: "numeric", month: "long", year: "numeric",
   });
 
   const element = React.createElement(ReportDocument, {
-    analysis, address, postcode, generatedAt, imageBase64s,
+    analysis, address, postcode, generatedAt, imageBase64s, customerNotes, roofContext,
   }) as unknown as React.ReactElement<import("@react-pdf/renderer").DocumentProps>;
 
   const buffer = await renderToBuffer(element);

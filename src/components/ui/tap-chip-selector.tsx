@@ -12,21 +12,39 @@ interface ChipOption<T extends string> {
 
 interface Props<T extends string> {
   options: ChipOption<T>[];
-  selected: T | null;
-  onSelect: (value: T) => void;
+  selected: T[];
+  onChange: (next: T[]) => void;
+  /** true (default): tapping a chip toggles it in/out — several can be active.
+   *  false: tapping a chip replaces the whole selection with just that value
+   *  (tapping the already-selected chip again clears it). */
+  multiple?: boolean;
   onClear?: () => void;
 }
 
-export function TapChipSelector<T extends string>({ options, selected, onSelect, onClear }: Props<T>) {
+export function TapChipSelector<T extends string>({
+  options,
+  selected,
+  onChange,
+  multiple = true,
+  onClear,
+}: Props<T>) {
+  function handleTap(value: T) {
+    if (multiple) {
+      onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
+    } else {
+      onChange(selected.includes(value) ? [] : [value]);
+    }
+  }
+
   return (
-    <div className="bg-white rounded-lg shadow-lg border p-2 flex flex-wrap gap-1.5 max-w-[220px]">
+    <div className="bg-white rounded-lg shadow-lg border p-2 flex flex-wrap gap-1.5 max-w-[240px]">
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
-          onClick={() => onSelect(opt.value)}
+          onClick={() => handleTap(opt.value)}
           className={`px-2.5 py-1.5 rounded-full text-xs font-medium border transition ${
-            selected === opt.value
+            selected.includes(opt.value)
               ? "border-blue-600 bg-blue-50 text-blue-700"
               : "border-gray-200 hover:border-gray-300 text-gray-600"
           }`}
@@ -34,7 +52,7 @@ export function TapChipSelector<T extends string>({ options, selected, onSelect,
           {opt.label}
         </button>
       ))}
-      {selected && onClear && (
+      {selected.length > 0 && onClear && (
         <button
           type="button"
           onClick={onClear}

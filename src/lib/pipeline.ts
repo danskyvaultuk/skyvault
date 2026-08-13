@@ -95,7 +95,9 @@ export async function runAnalysisPipeline(surveyId: string) {
       analysis,
       survey.property.address,
       survey.property.postcode,
-      imageData.map((d) => d.base64)
+      imageData.map((d) => d.base64),
+      survey.notes,
+      roofContext
     );
 
     // ── Step 6: Upload PDF to S3 ───────────────────────────────────────────
