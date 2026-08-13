@@ -103,6 +103,12 @@ export default function SurveyPage() {
       const body = await res.json().catch(() => ({}));
       setError(body.error ?? "Analysis failed. Please try again.");
       setAnalysing(false);
+      // Refetch — the survey's actual status may have moved on (e.g. a previous
+      // attempt already marked it "failed") since this page last loaded it.
+      // Without this, the page can keep showing "Analyse roof with AI" after a
+      // failed run instead of the "Retry analysis" button, and a second click
+      // just repeats the same confusing "Survey is already failed" error.
+      fetchSurvey();
       return;
     }
     router.push(`/surveys/${id}/report`);

@@ -56,7 +56,7 @@ SkyVault is a three-sided marketplace:
 | Email | Resend | From: `noreply@skyvaultuk.com` (verified domain) |
 | Payments | Stripe Checkout + webhooks | Subscriptions + drone deposit (£50); webhook at `/api/stripe/webhook` |
 | UI | Tailwind CSS | No Shadcn/ui — plain Tailwind throughout |
-| Hosting | Vercel (Pro) | 60s timeout on analyse + drone-jobs routes |
+| Hosting | Vercel (Pro) | 180s timeout on analyse + drone-jobs routes (raised from 60s — large drone photos were pushing close to the old limit) |
 | Address lookup | Nominatim (OpenStreetMap) + postcodes.io | Free, no API key required |
 
 ---
@@ -76,7 +76,7 @@ Accounts needed:
 - [Stripe](https://stripe.com) — sandbox mode for development
 - [Resend](https://resend.com) — verified domain `skyvaultuk.com`
 - [Google Cloud Console](https://console.cloud.google.com) — OAuth 2.0 credentials
-- [Vercel](https://vercel.com) — Pro plan required (60s timeout)
+- [Vercel](https://vercel.com) — Pro plan required (up to 300s function duration; we use 180s)
 
 ---
 
@@ -209,7 +209,7 @@ roofAI/
 ├── BUILD.md                     # This file
 ├── .env.local                   # Local secrets (gitignored)
 ├── next.config.ts               # serverComponentsExternalPackages for react-pdf
-├── vercel.json                  # 60s timeout on analyse + drone-jobs routes
+├── vercel.json                  # 180s timeout on analyse + drone-jobs routes
 ├── middleware.ts                # Role-based route protection
 ├── tailwind.config.ts
 │
@@ -548,7 +548,7 @@ User (roofer) ──  Subscription
 - [x] `/login`, `/register`, `/verify` pages
 - [x] Customer, Roofer, Drone, Admin layout shells
 - [x] Marketing landing page
-- [x] `vercel.json` — 60s timeout on analyse + drone-jobs routes
+- [x] `vercel.json` — 180s timeout on analyse + drone-jobs routes (raised from 60s — large drone photos were pushing close to the old limit)
 - [x] All environment variables documented
 
 ---
