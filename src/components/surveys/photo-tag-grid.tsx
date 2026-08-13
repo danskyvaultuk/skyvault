@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TapChipSelector } from "@/components/ui/tap-chip-selector";
 import {
   ROOF_PARTS, ROOF_PART_LABELS, ASPECTS, ASPECT_LABELS,
@@ -32,33 +32,49 @@ interface Props {
   photos: TaggablePhoto[];
 }
 
+const EMPTY_TAG: TagState = { roofParts: [], aspect: null, saving: false, error: false };
+
 export function PhotoTagGrid({ photos }: Props) {
-  const [tags, setTags] = useState<Record<string, TagState>>(() =>
-    Object.fromEntries(
-      photos.map((p) => [p.id, { roofParts: p.roofParts, aspect: p.aspect, saving: false, error: false }])
-    )
+  const initial = Object.fromEntries(
+    photos.map((p) => [p.id, { roofParts: p.roofParts, aspect: p.aspect, saving: false, error: false }])
   );
+  const [tags, setTags] = useState<Record<string, TagState>>(initial);
   const [openId, setOpenId] = useState<string | null>(null);
+
+  // Mirrors `tags` but updated synchronously (plain assignment, not through
+  // React's batched setState) so that two taps fired in quick succession —
+  // exactly what multi-select encourages — each read the true latest value
+  // instead of a stale one from a closure that hasn't re-rendered yet.
+  const tagsRef = useRef(initial);
+  function getTag(photoId: string): TagState {
+    return tagsRef.current[photoId] ?? EMPTY_TAG;
+  }
+  function writeTag(photoId: string, next: TagState) {
+    tagsRef.current = { ...tagsRef.current, [photoId]: next };
+    setTags(tagsRef.current);
+  }
 
   // New photos can arrive after upload completes — seed state for any photo
   // id we haven't seen yet without clobbering in-flight/local edits.
   useEffect(() => {
-    setTags((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const p of photos) {
-        if (!(p.id in next)) {
-          next[p.id] = { roofParts: p.roofParts, aspect: p.aspect, saving: false, error: false };
-          changed = true;
-        }
+    let changed = false;
+    const next = { ...tagsRef.current };
+    for (const p of photos) {
+      if (!(p.id in next)) {
+        next[p.id] = { roofParts: p.roofParts, aspect: p.aspect, saving: false, error: false };
+        changed = true;
       }
-      return changed ? next : prev;
-    });
+    }
+    if (changed) {
+      tagsRef.current = next;
+      setTags(next);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photos]);
 
   async function saveTag(photoId: string, next: { roofParts: RoofPart[]; aspect: Aspect | null }) {
-    const previous = tags[photoId] ?? { roofParts: [], aspect: null };
-    setTags((prev) => ({ ...prev, [photoId]: { ...next, saving: true, error: false } }));
+    const previous = getTag(photoId);
+    writeTag(photoId, { ...next, saving: true, error: false });
 
     try {
       const res = await fetch(`/api/photos/${photoId}/tag`, {
@@ -67,24 +83,19 @@ export function PhotoTagGrid({ photos }: Props) {
         body: JSON.stringify(next),
       });
       if (!res.ok) throw new Error("Failed to save tag");
-      setTags((prev) => ({ ...prev, [photoId]: { ...next, saving: false, error: false } }));
+      writeTag(photoId, { ...next, saving: false, error: false });
     } catch {
       // Revert the optimistic update and surface an inline retry — never a blocking error.
-      setTags((prev) => ({
-        ...prev,
-        [photoId]: { roofParts: previous.roofParts, aspect: previous.aspect, saving: false, error: true },
-      }));
+      writeTag(photoId, { roofParts: previous.roofParts, aspect: previous.aspect, saving: false, error: true });
     }
   }
 
   function setParts(photoId: string, roofParts: RoofPart[]) {
-    const aspect = tags[photoId]?.aspect ?? null;
-    saveTag(photoId, { roofParts, aspect });
+    saveTag(photoId, { roofParts, aspect: getTag(photoId).aspect });
   }
 
   function setAspect(photoId: string, aspect: Aspect[]) {
-    const roofParts = tags[photoId]?.roofParts ?? [];
-    saveTag(photoId, { roofParts, aspect: aspect[0] ?? null });
+    saveTag(photoId, { roofParts: getTag(photoId).roofParts, aspect: aspect[0] ?? null });
   }
 
   function clearAll(photoId: string) {
@@ -153,41 +164,76 @@ export function PhotoTagGrid({ photos }: Props) {
                 </button>
               )}
 
+              {/* Bottom-sheet on all sizes rather than an inline popover anchored to the
+                  thumbnail — an anchored popover doesn't reserve layout space, so once it
+                  grew to two chip groups it visually overlapped whatever was below it on
+                  the page. A fixed sheet with its own backdrop avoids that regardless of
+                  where the thumbnail sits in the grid or how long the chip lists get. */}
               {isOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setOpenId(null)} />
-                  <div className="absolute top-full left-0 mt-1 z-20 space-y-2">
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 px-1">
-                        What&apos;s shown
-                      </p>
-                      <TapChipSelector
-                        options={PART_OPTIONS}
-                        selected={tag.roofParts}
-                        onChange={(next) => setParts(photo.id, next)}
-                        multiple
-                      />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1 px-1">
-                        Direction (optional)
-                      </p>
-                      <TapChipSelector
-                        options={ASPECT_OPTIONS}
-                        selected={tag.aspect ? [tag.aspect] : []}
-                        onChange={(next) => setAspect(photo.id, next)}
-                        multiple={false}
-                      />
-                    </div>
-                    {hasTag && (
+                  <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setOpenId(null)} />
+                  <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl p-5 max-h-[85vh] overflow-y-auto sm:max-w-sm sm:mx-auto sm:inset-x-0 sm:bottom-8 sm:rounded-2xl">
+                    <div className="flex items-center gap-3 mb-4">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photo.url} alt="" className="w-12 h-12 rounded-lg object-cover border flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">Tag this photo</p>
+                        <p className="text-xs text-gray-400">Optional — tap to select, tap again to remove</p>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => clearAll(photo.id)}
-                        className="w-full text-center text-xs text-gray-400 hover:text-red-500 bg-white rounded-lg border shadow-lg py-1.5"
+                        onClick={() => setOpenId(null)}
+                        className="ml-auto text-gray-400 hover:text-gray-600 text-2xl leading-none px-1 flex-shrink-0"
+                        aria-label="Close"
                       >
-                        Clear all tags
+                        ×
                       </button>
-                    )}
+                    </div>
+
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      What&apos;s shown
+                    </p>
+                    <TapChipSelector
+                      options={PART_OPTIONS}
+                      selected={tag.roofParts}
+                      onChange={(next) => setParts(photo.id, next)}
+                      multiple
+                      bare
+                    />
+
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-1">
+                      Which way does this roof slope face?
+                    </p>
+                    <p className="text-[11px] text-gray-400 mb-2">
+                      Optional — e.g. a south-facing slope gets more sun and weathers differently
+                      to a shaded, north-facing one.
+                    </p>
+                    <TapChipSelector
+                      options={ASPECT_OPTIONS}
+                      selected={tag.aspect ? [tag.aspect] : []}
+                      onChange={(next) => setAspect(photo.id, next)}
+                      multiple={false}
+                      bare
+                    />
+
+                    <div className="flex items-center gap-3 mt-5">
+                      {hasTag && (
+                        <button
+                          type="button"
+                          onClick={() => clearAll(photo.id)}
+                          className="text-xs text-gray-400 hover:text-red-500"
+                        >
+                          Clear all tags
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setOpenId(null)}
+                        className="ml-auto bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-800"
+                      >
+                        Done
+                      </button>
+                    </div>
                   </div>
                 </>
               )}

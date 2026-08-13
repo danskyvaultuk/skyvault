@@ -19,6 +19,10 @@ interface Props<T extends string> {
    *  (tapping the already-selected chip again clears it). */
   multiple?: boolean;
   onClear?: () => void;
+  /** Render just the chips with no card chrome (bg/border/shadow/max-width) —
+   * for embedding inside a parent that already provides the card, e.g. a
+   * bottom-sheet modal with multiple chip groups. */
+  bare?: boolean;
 }
 
 export function TapChipSelector<T extends string>({
@@ -27,6 +31,7 @@ export function TapChipSelector<T extends string>({
   onChange,
   multiple = true,
   onClear,
+  bare = false,
 }: Props<T>) {
   function handleTap(value: T) {
     if (multiple) {
@@ -37,7 +42,7 @@ export function TapChipSelector<T extends string>({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-lg border p-2 flex flex-wrap gap-1.5 max-w-[240px]">
+    <div className={bare ? "flex flex-wrap gap-1.5" : "bg-white rounded-lg shadow-lg border p-2 flex flex-wrap gap-1.5 max-w-[240px]"}>
       {options.map((opt) => (
         <button
           key={opt.value}
