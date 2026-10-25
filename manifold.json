@@ -1,0 +1,32 @@
+{
+  "project": "skyvault",
+  "corpus": {
+    "remote": "git@github.com:danskyvaultuk/skyvault-corpus.git"
+  },
+  "history": {
+    "remote": "git@github.com:danskyvaultuk/skyvault-history.git"
+  },
+  "tools": [
+    {
+      "name": "test",
+      "command": "npm test",
+      "placement": "container",
+      "tree": "workspace",
+      "reads": [
+        "src/**/*.test.ts",
+        "src/**/*.ts",
+        "vitest.config.ts"
+      ],
+      "config": []
+    }
+  ],
+  "audit": {
+    "source": [
+      "src"
+    ],
+    "complexity": "refuse",
+    "deadcode": "report",
+    "deps": "off",
+    "dup": "report"
+  }
+}
