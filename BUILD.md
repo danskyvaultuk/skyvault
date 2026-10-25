@@ -65,7 +65,7 @@ SkyVault is a three-sided marketplace:
 
 ```bash
 node --version   # 18+
-npm --version    # 9+
+pnpm --version   # 10+ (corepack enable; the version is pinned by packageManager in package.json)
 ```
 
 Accounts needed:
@@ -135,19 +135,19 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ### 2. Run migrations
 
 ```bash
-npx prisma migrate deploy
+pnpm exec prisma migrate deploy
 ```
 
 ### 3. Generate client
 
 ```bash
-npx prisma generate
+pnpm exec prisma generate
 ```
 
 ### 4. Inspect data
 
 ```bash
-npx prisma studio
+pnpm exec prisma studio
 # Opens at http://localhost:5555
 ```
 
@@ -635,16 +635,16 @@ User (roofer) ──  Subscription
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Generate Prisma client
-npx prisma generate
+pnpm exec prisma generate
 
 # Run database migrations
-npx prisma migrate deploy
+pnpm exec prisma migrate deploy
 
 # Start dev server
-npm run dev
+pnpm dev
 # App at http://localhost:3000
 ```
 

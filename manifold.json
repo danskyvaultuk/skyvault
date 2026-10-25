@@ -9,7 +9,7 @@
   "tools": [
     {
       "name": "test",
-      "command": "npm test",
+      "command": "pnpm test",
       "placement": "container",
       "tree": "workspace",
       "reads": [
