@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { isReportReleased } from "@/lib/reportRelease";
 
 const STATUS_COLOURS: Record<string, string> = {
   draft:     "bg-gray-100 text-gray-600",
@@ -20,7 +21,7 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
     include: {
       surveys: {
         orderBy: { createdAt: "desc" },
-        include: { report: { select: { conditionScore: true } } },
+        include: { report: { select: { conditionScore: true, status: true } } },
       },
     },
   });
@@ -79,14 +80,21 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {s.report?.conditionScore !== undefined && (
+                {s.report && isReportReleased(s.report.status) && (
                   <span className="text-sm font-bold text-gray-700">
                     {s.report.conditionScore}/10
                   </span>
                 )}
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLOURS[s.status] ?? STATUS_COLOURS.draft}`}>
-                  {s.status}
-                </span>
+                {/* A report held for admin review (BL-061) reads "being checked". */}
+                {s.report && !isReportReleased(s.report.status) ? (
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+                    being checked
+                  </span>
+                ) : (
+                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLOURS[s.status] ?? STATUS_COLOURS.draft}`}>
+                    {s.status}
+                  </span>
+                )}
               </div>
             </Link>
           ))}

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPresignedReadUrl } from "@/lib/r2";
 import { roofContextSummaryLines, type RoofContext } from "@/lib/roofContext";
+import { isReportReleased } from "@/lib/reportRelease";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -35,6 +36,22 @@ function ScoreGauge({ score }: { score: number }) {
   );
 }
 
+function BeingCheckedNotice({ surveyId }: { surveyId: string }) {
+  return (
+    <div className="p-8 max-w-3xl">
+      <Link href={`/surveys/${surveyId}`} className="text-sm text-blue-600 hover:underline mb-6 inline-block">
+        ← Back to survey
+      </Link>
+      <div className="bg-blue-50 border border-blue-200 rounded-xl px-6 py-6">
+        <h1 className="text-xl font-bold text-blue-900 mb-2">Your report is being checked</h1>
+        <p className="text-sm text-blue-800">
+          Our team checks every roof report before it is released. We&apos;ll email you as soon as yours is ready.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default async function ReportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: surveyId } = await params;
   const session = await auth();
@@ -55,6 +72,12 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   if (!survey.report) redirect(`/surveys/${surveyId}`);
 
   const report = survey.report;
+  const isAdmin = session.user.role === "admin";
+  const released = isReportReleased(report.status);
+
+  // Held for admin review (BL-061): the customer sees only that it is being
+  // checked, and no signed photo or PDF URL is made for them.
+  if (!released && !isAdmin) return <BeingCheckedNotice surveyId={surveyId} />;
 
   // Parse JSON fields from the database
   const defects = (report.defectsJson as Array<{
@@ -79,6 +102,15 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       <Link href={`/surveys/${surveyId}`} className="text-sm text-blue-600 hover:underline mb-6 inline-block">
         ← Back to survey
       </Link>
+
+      {!released && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-6">
+          <p className="text-amber-800 font-semibold text-sm">Held for review: the customer cannot see this report yet.</p>
+          <Link href={`/admin/reports/${report.id}`} className="text-sm text-amber-700 hover:underline">
+            Review and approve →
+          </Link>
+        </div>
+      )}
 
       {/* Header */}
       <div className="mb-8">

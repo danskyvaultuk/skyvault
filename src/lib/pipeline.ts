@@ -1,27 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { getPresignedReadUrl, generatePdfKey, uploadBuffer } from "@/lib/r2";
+import { generatePdfKey, uploadBuffer } from "@/lib/r2";
 import { analyzeRoof } from "@/lib/claude";
 import { renderReportPDF } from "@/lib/pdf";
 import { distributeLeads } from "@/lib/leads";
-import { notifyCustomerReportReady } from "@/lib/resend";
 import { journeys } from "@/lib/journeys";
 import { RoofContextSchema } from "@/lib/roofContext";
-import sharp from "sharp";
-
-// Claude Vision limit is 5MB per image.
-// We resize to max 1568px and convert to JPEG so every image comfortably fits.
-// The original full-res file stays untouched in S3.
-async function resizeForClaude(buffer: ArrayBuffer): Promise<{ data: Buffer; mimeType: string }> {
-  const resized = await sharp(Buffer.from(buffer))
-    .resize(1568, 1568, {
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .jpeg({ quality: 85 })
-    .toBuffer();
-
-  return { data: resized, mimeType: "image/jpeg" };
-}
+import { fetchSurveyPhotos } from "@/lib/surveyImages";
 
 /**
  * Runs the full AI analysis pipeline for a survey.
@@ -59,20 +43,7 @@ export async function runAnalysisPipeline(surveyId: string) {
     // ── Step 3: Fetch images from S3, resize, convert to base64 ───────────
     console.log(`[pipeline] Fetching ${survey.images.length} images for survey ${surveyId}…`);
 
-    const imageData = await Promise.all(
-      survey.images.map(async (img) => {
-        const readUrl = await getPresignedReadUrl(img.s3Key);
-        const response = await fetch(readUrl);
-        if (!response.ok) throw new Error(`Failed to fetch image: ${img.s3Key}`);
-        const rawBuffer = await response.arrayBuffer();
-
-        const { data, mimeType } = await resizeForClaude(rawBuffer);
-        const sizeKB = Math.round(data.length / 1024);
-        console.log(`[pipeline] Resized ${img.originalFilename ?? img.s3Key} → ${sizeKB}KB`);
-
-        return { base64: data.toString("base64"), mimeType };
-      })
-    );
+    const imageData = await fetchSurveyPhotos(survey.images);
 
     // ── Step 4: Call Claude Vision ─────────────────────────────────────────
     console.log("[pipeline] Sending images to Claude…");
@@ -117,7 +88,8 @@ export async function runAnalysisPipeline(surveyId: string) {
         confidence: analysis.confidence,
         rawAiResponse: analysis as object,
         pdfS3Key: pdfKey,
-        status: "published",
+        // Held until an admin approves it (BL-061).
+        status: "draft",
       },
     });
 
@@ -136,12 +108,9 @@ export async function runAnalysisPipeline(surveyId: string) {
       }
     }
 
-    // ── Step 10: Notify customer ───────────────────────────────────────────
-    notifyCustomerReportReady({
-      customerEmail: survey.customer.email,
-      customerName: survey.customer.name ?? "",
-      surveyId,
-    }).catch((err) => console.error("[pipeline] Customer email failed:", err));
+    // ── Step 10: No customer email here ────────────────────────────────────
+    // The report is held for admin review; the customer is emailed when an
+    // admin approves it (ReportReview.approve, BL-061).
 
     console.log(`[pipeline] Complete! reportId: ${report.id}`);
     return report;

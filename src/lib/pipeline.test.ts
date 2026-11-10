@@ -229,3 +229,16 @@ describe("runAnalysisPipeline — lead distribution follows the roofer journey (
     expect(mockDistributeLeads).toHaveBeenCalledWith("survey-1", "report-1", "SW1A 1AA");
   });
 });
+
+describe("runAnalysisPipeline — every report is held for admin review (BL-061)", () => {
+  it("saves the report held (draft) and does not email the customer", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+
+    await runAnalysisPipeline("survey-1");
+
+    expect(mockReportCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "draft" }) })
+    );
+    expect(mockNotifyCustomer).not.toHaveBeenCalled();
+  });
+});

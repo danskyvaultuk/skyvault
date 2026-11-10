@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { SurveyStatus, Prisma } from "@prisma/client";
 import { RoofContextSchema, sanitizeRoofContext } from "@/lib/roofContext";
 import { getPresignedReadUrl } from "@/lib/r2";
+import { reportForViewer } from "@/lib/reportRelease";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -37,7 +38,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   );
   const images = survey.images.map((img, i) => ({ ...img, url: imageUrls[i] }));
 
-  return NextResponse.json({ ...survey, images });
+  // A held report is not shown to the customer until an admin approves it,
+  // and admin notes are never shown to a customer (BL-061).
+  const report = reportForViewer(survey.report, session.user.role === "admin");
+
+  return NextResponse.json({ ...survey, images, report });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

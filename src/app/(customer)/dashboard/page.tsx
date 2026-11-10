@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { journeys } from "@/lib/journeys";
+import { isReportReleased } from "@/lib/reportRelease";
 
 const SCORE_COLOUR = (score: number) =>
   score <= 3 ? "text-red-600" : score <= 6 ? "text-amber-500" : "text-green-600";
@@ -13,6 +14,9 @@ const STATUS_BADGE: Record<string, { label: string; colour: string }> = {
   complete:   { label: "Report ready", colour: "bg-green-100 text-green-700" },
   failed:     { label: "Failed",        colour: "bg-red-100 text-red-700" },
 };
+
+// A report held for admin review (BL-061) shows this instead of "Report ready".
+const BEING_CHECKED = { label: "Being checked", colour: "bg-amber-100 text-amber-700" };
 
 export default async function CustomerDashboard() {
   const session = await auth();
@@ -30,7 +34,7 @@ export default async function CustomerDashboard() {
       take: 5,
       include: {
         property: { select: { address: true, postcode: true } },
-        report: { select: { conditionScore: true, confidence: true } },
+        report: { select: { conditionScore: true, confidence: true, status: true } },
         lead: { include: { _count: { select: { claims: true } } } },
       },
     }),
@@ -42,7 +46,9 @@ export default async function CustomerDashboard() {
       : Promise.resolve(0),
   ]);
 
-  const completedSurveys = recentSurveys.filter((s) => s.status === "complete");
+  const completedSurveys = recentSurveys.filter(
+    (s) => s.status === "complete" && !!s.report && isReportReleased(s.report.status)
+  );
   const isNewUser = properties.length === 0;
 
   return (
@@ -127,7 +133,8 @@ export default async function CustomerDashboard() {
           </div>
           <div className="space-y-3">
             {recentSurveys.map((survey) => {
-              const badge = STATUS_BADGE[survey.status] ?? STATUS_BADGE.draft;
+              const held = !!survey.report && !isReportReleased(survey.report.status);
+              const badge = held ? BEING_CHECKED : STATUS_BADGE[survey.status] ?? STATUS_BADGE.draft;
               const claimCount = survey.lead?._count.claims ?? 0;
 
               return (
@@ -150,7 +157,7 @@ export default async function CustomerDashboard() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    {survey.report ? (
+                    {survey.report && !held ? (
                       <>
                         <p className={`text-2xl font-bold ${SCORE_COLOUR(survey.report.conditionScore)}`}>
                           {survey.report.conditionScore}/10
