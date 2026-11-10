@@ -59,7 +59,7 @@ export type ReportReviewDeps = {
 export type ReviewResult =
   | { ok: true; status: ReportStatus }
   | { ok: false; reason: "invalid"; detail: unknown }
-  | { ok: false; reason: "not-found" | "already-released" };
+  | { ok: false; reason: "not-found" | "already-released" | "held" };
 
 type AiAnswer = Partial<RoofAnalysis>;
 
@@ -119,12 +119,30 @@ export class ReportReview {
 
     const status: ReportStatus = wasCorrected(report) ? "overridden" : "published";
     await this.deps.updateReport(report.id, { status });
-    await this.deps.notifyCustomer({
+    await this.emailCustomer(report);
+    return { ok: true, status };
+  }
+
+  /**
+   * Sends the "report ready" email again for a report the customer can
+   * already see (BL-063), for instance after a lost email or a broken link.
+   * Changes nothing on the report. A held report is released by approval.
+   */
+  async resendEmail(reportId: string): Promise<ReviewResult> {
+    const report = await this.deps.findReport(reportId);
+    if (!report) return { ok: false, reason: "not-found" };
+    if (!isReportReleased(report.status)) return { ok: false, reason: "held" };
+
+    await this.emailCustomer(report);
+    return { ok: true, status: report.status };
+  }
+
+  private emailCustomer(report: ReviewReport): Promise<void> {
+    return this.deps.notifyCustomer({
       customerEmail: report.survey.customer.email,
       customerName: report.survey.customer.name ?? "",
       surveyId: report.surveyId,
     });
-    return { ok: true, status };
   }
 
   private async remakePdf(report: ReviewReport, correction: ReportCorrection): Promise<string> {

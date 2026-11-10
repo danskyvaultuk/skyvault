@@ -184,3 +184,33 @@ describe("wasCorrected", () => {
     expect(wasCorrected(makeReport("draft", overrides as Partial<ReviewReport>))).toBe(true);
   });
 });
+
+describe("ReportReview.resendEmail", () => {
+  it.each(["published", "overridden"] as const)("re-sends the email once for a %s report and changes nothing", async (status) => {
+    useReport(makeReport(status));
+
+    const result = await review.resendEmail("report-1");
+
+    expect(result).toEqual({ ok: true, status });
+    expect(deps.notifyCustomer).toHaveBeenCalledTimes(1);
+    expect(deps.notifyCustomer).toHaveBeenCalledWith({
+      customerEmail: "jane@example.com",
+      customerName: "Jane",
+      surveyId: "survey-1",
+    });
+    expect(deps.updateReport).not.toHaveBeenCalled();
+  });
+
+  it("refuses a held report and sends nothing", async () => {
+    useReport(makeReport("draft"));
+
+    expect(await review.resendEmail("report-1")).toMatchObject({ ok: false, reason: "held" });
+    expect(deps.notifyCustomer).not.toHaveBeenCalled();
+  });
+
+  it("answers not-found for an unknown report", async () => {
+    useReport(null);
+    expect(await review.resendEmail("missing")).toMatchObject({ ok: false, reason: "not-found" });
+    expect(deps.notifyCustomer).not.toHaveBeenCalled();
+  });
+});

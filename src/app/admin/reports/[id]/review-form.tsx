@@ -88,6 +88,13 @@ export function ReviewForm({ reportId, held, photoCount, initial }: Props) {
     return send(`/api/admin/reports/${reportId}/approve`, { method: "POST" }, "Approved. The customer has been emailed.");
   }
 
+  // Released reports only (BL-063): send the "report ready" email again,
+  // e.g. after a lost email or a broken link. The report is not changed.
+  function resendEmail() {
+    if (!confirm("Send the customer the \"report ready\" email again?")) return;
+    return send(`/api/admin/reports/${reportId}/resend-email`, { method: "POST" }, "Email re-sent to the customer.");
+  }
+
   return (
     <div className="bg-white border rounded-xl p-5 space-y-5">
       <h2 className="font-semibold text-gray-900">Review and correct</h2>
@@ -134,6 +141,12 @@ export function ReviewForm({ reportId, held, photoCount, initial }: Props) {
           <button type="button" disabled={busy} onClick={approve}
             className="bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-green-700 disabled:opacity-50">
             Approve and send to customer
+          </button>
+        )}
+        {!held && (
+          <button type="button" disabled={busy} onClick={resendEmail}
+            className="border border-blue-300 text-blue-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-50 disabled:opacity-50">
+            Re-send &quot;report ready&quot; email
           </button>
         )}
       </div>
