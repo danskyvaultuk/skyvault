@@ -1,11 +1,15 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { journeys } from "@/lib/journeys";
+import { RETURN_PARAM, signInReturnPath } from "@/lib/returnPath";
 
-export default function LoginPage() {
+function LoginForm() {
+  // Return to the page the visitor asked for, if it is a SkyVault page (BL-062).
+  const callbackUrl = signInReturnPath(useSearchParams().get(RETURN_PARAM));
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const result = await signIn("resend", { email, redirect: false, callbackUrl: "/auth/redirect" });
+    const result = await signIn("resend", { email, redirect: false, callbackUrl });
 
     if (result?.error) {
       setError("Could not send magic link. Please try again.");
@@ -84,7 +88,7 @@ return (
             {/* GOOGLE */}
             <div className="mt-4">
               <button
-                onClick={() => signIn("google", { callbackUrl: "/auth/redirect" })}
+                onClick={() => signIn("google", { callbackUrl })}
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-3 border border-gray-300 rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
@@ -122,5 +126,13 @@ return (
 
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

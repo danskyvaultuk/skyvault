@@ -3,6 +3,7 @@ import { authConfig } from "@/lib/auth.config";
 import { NextResponse } from "next/server";
 import { journeys } from "@/lib/journeys";
 import { JourneyGuard } from "@/lib/journeyGuard";
+import { loginPathFor } from "@/lib/returnPath";
 
 const { auth } = NextAuth(authConfig);
 
@@ -41,7 +42,10 @@ export default auth((req) => {
     const session = req.auth;
 
     if (!session) {
-      return NextResponse.redirect(new URL("/login", req.url));
+      // A signed-out visitor asking for a page (say, the report linked from an
+      // email) signs in and comes back to it (BL-062).
+      const target = pathname.startsWith("/api/") ? "/login" : loginPathFor(pathname, req.nextUrl.search);
+      return NextResponse.redirect(new URL(target, req.url));
     }
 
     const role = session.user.role as string;
