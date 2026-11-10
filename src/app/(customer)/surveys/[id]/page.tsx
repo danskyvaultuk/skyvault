@@ -7,6 +7,8 @@ import { RoofContextCard, type RoofContext } from "@/components/surveys/roof-con
 import { PhotoTagGrid, type TaggablePhoto } from "@/components/surveys/photo-tag-grid";
 import { DroneBookingPanel } from "./drone-booking";
 import { journeys } from "@/lib/journeys";
+import { isReportReleased } from "@/lib/reportRelease";
+import type { ReportStatus } from "@prisma/client";
 
 interface DroneJob {
   id: string;
@@ -23,6 +25,7 @@ interface Survey {
   property: { address: string; postcode: string };
   images: TaggablePhoto[];
   droneJob: DroneJob | null;
+  report?: { id: string; status: ReportStatus } | null;
 }
 
 const STATUS_LABELS: Record<string, Record<string, { label: string; colour: string }>> = {
@@ -126,7 +129,11 @@ export default function SurveyPage() {
 
   const isDrone = survey.type === "drone_capture";
   const typeLabels = STATUS_LABELS[survey.type] ?? STATUS_LABELS.self_upload;
-  const statusInfo = typeLabels[survey.status] ?? typeLabels.draft;
+  // A report held for admin review (BL-061) reads "being checked", not "ready".
+  const reportHeld = !!survey.report && !isReportReleased(survey.report.status);
+  const statusInfo = reportHeld
+    ? { label: "Report being checked", colour: "bg-amber-100 text-amber-700" }
+    : typeLabels[survey.status] ?? typeLabels.draft;
   const canAnalyse = imageCount >= 1 && (survey.status === "draft" || survey.status === "pending");
   const droneBooked = justBooked || !!survey.droneJob;
 
@@ -344,7 +351,7 @@ export default function SurveyPage() {
           href={`/surveys/${id}/report`}
           className="block w-full text-center bg-green-600 text-white rounded-lg py-3 text-sm font-medium hover:bg-green-700"
         >
-          View your report →
+          {reportHeld ? "Your report is being checked — we'll email you when it's ready" : "View your report →"}
         </a>
       )}
 
