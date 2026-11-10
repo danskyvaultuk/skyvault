@@ -35,7 +35,7 @@ export function buildReportReview(): ReportReview {
   });
 }
 
-const FAILURE_STATUS = { invalid: 400, "not-found": 404, "already-released": 409 } as const;
+const FAILURE_STATUS = { invalid: 400, "not-found": 404, "already-released": 409, held: 409 } as const;
 
 /** The HTTP answer for a review result. */
 export function reviewResponse(result: ReviewResult): NextResponse {
