@@ -3,7 +3,6 @@ import { getPresignedReadUrl, generatePdfKey, uploadBuffer } from "@/lib/r2";
 import { analyzeRoof } from "@/lib/claude";
 import { renderReportPDF } from "@/lib/pdf";
 import { distributeLeads } from "@/lib/leads";
-import { notifyCustomerReportReady } from "@/lib/resend";
 import { journeys } from "@/lib/journeys";
 import { RoofContextSchema } from "@/lib/roofContext";
 import sharp from "sharp";
@@ -117,7 +116,8 @@ export async function runAnalysisPipeline(surveyId: string) {
         confidence: analysis.confidence,
         rawAiResponse: analysis as object,
         pdfS3Key: pdfKey,
-        status: "published",
+        // Held until an admin approves it (BL-061).
+        status: "draft",
       },
     });
 
@@ -136,12 +136,9 @@ export async function runAnalysisPipeline(surveyId: string) {
       }
     }
 
-    // ── Step 10: Notify customer ───────────────────────────────────────────
-    notifyCustomerReportReady({
-      customerEmail: survey.customer.email,
-      customerName: survey.customer.name ?? "",
-      surveyId,
-    }).catch((err) => console.error("[pipeline] Customer email failed:", err));
+    // ── Step 10: No customer email here ────────────────────────────────────
+    // The report is held for admin review; the customer is emailed when an
+    // admin approves it (ReportReview.approve, BL-061).
 
     console.log(`[pipeline] Complete! reportId: ${report.id}`);
     return report;
