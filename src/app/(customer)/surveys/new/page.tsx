@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { journeys } from "@/lib/journeys";
 
 interface Property {
   id: string;
@@ -38,7 +39,7 @@ export default function NewSurveyPage() {
     const res = await fetch("/api/surveys", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ propertyId, type, notes }),
+      body: JSON.stringify({ propertyId, type: journeys.droneEnabled ? type : "self_upload", notes }),
     });
 
     if (!res.ok) {
@@ -57,7 +58,9 @@ export default function NewSurveyPage() {
     <div className="p-8 max-w-xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">New roof survey</h1>
       <p className="text-gray-500 mb-8">
-        Choose the property and how you want the survey done.
+        {journeys.droneEnabled
+          ? "Choose the property and how you want the survey done."
+          : "Choose the property, then upload your own roof photos."}
       </p>
 
       {properties.length === 0 ? (
@@ -99,6 +102,8 @@ export default function NewSurveyPage() {
             </select>
           </div>
 
+          {/* Launch scope (BL-058): the type choice exists only while drone capture is on. */}
+          {journeys.droneEnabled && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Survey type</label>
             <div className="grid grid-cols-2 gap-3">
@@ -123,6 +128,7 @@ export default function NewSurveyPage() {
               ))}
             </div>
           </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

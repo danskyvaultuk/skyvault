@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { journeys } from "@/lib/journeys";
 
 const SCORE_COLOUR = (score: number) =>
   score <= 3 ? "text-red-600" : score <= 6 ? "text-amber-500" : "text-green-600";
@@ -62,7 +63,7 @@ export default async function CustomerDashboard() {
         >
           <p className="text-2xl mb-2">📸</p>
           <p className="font-semibold">New survey</p>
-          <p className="text-sm text-blue-200 mt-0.5">Upload photos or book a drone</p>
+          <p className="text-sm text-blue-200 mt-0.5">{journeys.droneEnabled ? "Upload photos or book a drone" : "Upload your roof photos"}</p>
         </Link>
         <Link
           href="/properties/new"
@@ -94,7 +95,7 @@ export default async function CustomerDashboard() {
           <ol className="space-y-3">
             {[
               { n: 1, text: "Add your property", href: "/properties/new", cta: "Add property" },
-              { n: 2, text: "Start a survey and upload roof photos (or book a drone)", href: "/surveys/new", cta: "Start survey" },
+              { n: 2, text: journeys.droneEnabled ? "Start a survey and upload roof photos (or book a drone)" : "Start a survey and upload roof photos", href: "/surveys/new", cta: "Start survey" },
               { n: 3, text: "Run AI analysis — get a full report in under a minute", href: null, cta: null },
             ].map(({ n, text, href, cta }) => (
               <li key={n} className="flex items-center gap-3">

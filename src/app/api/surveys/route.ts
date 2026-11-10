@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { journeys } from "@/lib/journeys";
 
 const createSchema = z.object({
   propertyId: z.string().cuid(),
@@ -39,6 +40,11 @@ export async function POST(req: Request) {
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+
+  // Launch scope (BL-058): drone capture only while the drone journey is on.
+  if (parsed.data.type === "drone_capture" && !journeys.droneEnabled) {
+    return NextResponse.json({ error: "Drone capture is not available at the moment." }, { status: 403 });
+  }
 
   const property = await prisma.property.findUnique({ where: { id: parsed.data.propertyId } });
   if (!property || property.ownerId !== session.user.id) {
