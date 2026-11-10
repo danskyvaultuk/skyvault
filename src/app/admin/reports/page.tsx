@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 
 // Reports held for review (BL-061): every new report waits here until an
 // admin approves it. Oldest first, so nobody waits longest.
 export default async function ReportsToReviewPage() {
+  const session = await auth();
+  if (!session || session.user.role !== "admin") redirect("/login");
+
   const reports = await prisma.report.findMany({
     where: { status: "draft" },
     orderBy: { createdAt: "asc" },

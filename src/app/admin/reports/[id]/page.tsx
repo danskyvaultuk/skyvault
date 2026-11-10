@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { getPresignedReadUrl } from "@/lib/r2";
 import { isReportReleased } from "@/lib/reportRelease";
 import { ReportCorrectionSchema, type ReportCorrection } from "@/lib/reportCorrection";
@@ -53,7 +55,64 @@ function AiOriginal({ ai }: { ai: AiAnswer }) {
   );
 }
 
+const SEVERITY_STYLES: Record<string, string> = {
+  critical: "bg-red-100 text-red-700",
+  high: "bg-orange-100 text-orange-700",
+  medium: "bg-blue-100 text-blue-700",
+  low: "bg-gray-100 text-gray-600",
+};
+
+type Preview = {
+  values: ReportCorrection;
+  remainingLife: number | null;
+  confidence: string;
+  surveyorNotes?: string;
+  pdfUrl: string | null;
+};
+
+// The report exactly as the customer will see it once released: the saved
+// (corrected) values, not the AI's original.
+function CustomerPreview({ preview }: { preview: Preview }) {
+  const { values } = preview;
+  return (
+    <div className="bg-white border rounded-xl p-5 mb-6 space-y-4">
+      <h2 className="font-semibold text-gray-900">What the customer will see</h2>
+      <div className="flex flex-wrap gap-6 text-sm">
+        <p><span className="text-3xl font-bold text-gray-900">{values.conditionScore}</span><span className="text-gray-400">/10</span></p>
+        {preview.remainingLife !== null && <p className="text-gray-600">Remaining life: {preview.remainingLife} years</p>}
+        <p className="text-gray-600 capitalize">AI confidence: {preview.confidence}</p>
+      </div>
+      {preview.surveyorNotes && <p className="text-sm text-blue-800 bg-blue-50 rounded-lg px-3 py-2">{preview.surveyorNotes}</p>}
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-2">Defects found ({values.defects.length})</p>
+        <ul className="space-y-2">
+          {values.defects.map((d, i) => (
+            <li key={i} className="flex items-start gap-3 text-sm">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${SEVERITY_STYLES[d.severity]}`}>{d.severity}</span>
+              <span className="text-gray-800"><span className="capitalize font-medium">{d.type.replace(/_/g, " ")}</span> — {d.description} <span className="text-gray-400">(photo {d.image_index + 1})</span></span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-2">Recommendations</p>
+        <ol className="list-decimal pl-5 text-sm text-gray-800 space-y-1">
+          {values.recommendations.map((r, i) => <li key={i}>{r}</li>)}
+        </ol>
+      </div>
+      {preview.pdfUrl && (
+        <a href={preview.pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-block text-sm text-blue-600 hover:underline">
+          Download the PDF →
+        </a>
+      )}
+    </div>
+  );
+}
+
 export default async function ReviewReportPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session || session.user.role !== "admin") redirect("/login");
+
   const { id } = await params;
   const report = await prisma.report.findUnique({
     where: { id },
@@ -76,6 +135,7 @@ export default async function ReviewReportPage({ params }: { params: Promise<{ i
   ]);
   const status = STATUS_LABEL[report.status];
   const ai = (report.rawAiResponse ?? {}) as AiAnswer;
+  const values = currentValues(report);
 
   return (
     <div className="p-4 md:p-8 max-w-4xl">
@@ -113,13 +173,23 @@ export default async function ReviewReportPage({ params }: { params: Promise<{ i
         </div>
       )}
 
+      <CustomerPreview
+        preview={{
+          values,
+          remainingLife: report.estimatedRemainingLife,
+          confidence: report.confidence,
+          surveyorNotes: ai.surveyor_notes,
+          pdfUrl,
+        }}
+      />
+
       <AiOriginal ai={ai} />
 
       <ReviewForm
         reportId={report.id}
         held={!isReportReleased(report.status)}
         photoCount={imageUrls.length}
-        initial={currentValues(report)}
+        initial={values}
       />
     </div>
   );
