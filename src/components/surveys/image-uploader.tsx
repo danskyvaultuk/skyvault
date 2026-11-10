@@ -3,14 +3,19 @@
 import { useRef, useCallback } from "react";
 import { useUpload } from "@/hooks/use-upload";
 import { cn } from "@/lib/utils";
+import type { RoofPart } from "@/lib/photoTag";
 
 interface Props {
   surveyId: string;
   onUploadComplete?: (count: number) => void;
+  /** Labels every photo uploaded here, e.g. a checklist item's roof parts (BL-021). */
+  roofParts?: readonly RoofPart[];
+  /** A smaller drop area, for use inside a checklist item. */
+  compact?: boolean;
 }
 
-export function ImageUploader({ surveyId, onUploadComplete }: Props) {
-  const { files, addFiles, uploadAll, removeFile, uploading, doneCount } = useUpload(surveyId);
+export function ImageUploader({ surveyId, onUploadComplete, roofParts, compact = false }: Props) {
+  const { files, addFiles, uploadAll, removeFile, uploading, doneCount } = useUpload(surveyId, roofParts);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDrop = useCallback(
@@ -41,7 +46,10 @@ export function ImageUploader({ surveyId, onUploadComplete }: Props) {
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
         onClick={() => inputRef.current?.click()}
-        className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition"
+        className={cn(
+          "border-2 border-dashed border-gray-300 rounded-xl text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition",
+          compact ? "p-4" : "p-8"
+        )}
       >
         <input
           ref={inputRef}
@@ -51,8 +59,8 @@ export function ImageUploader({ surveyId, onUploadComplete }: Props) {
           className="hidden"
           onChange={handleFileChange}
         />
-        <p className="text-gray-600 font-medium">Drop roof images here, or click to browse</p>
-        <p className="text-sm text-gray-400 mt-1">JPEG, PNG, WebP — max 20MB each — up to 10 images</p>
+        <p className="text-gray-600 font-medium">{compact ? "Add photos" : "Drop roof images here, or click to browse"}</p>
+        {!compact && <p className="text-sm text-gray-400 mt-1">JPEG, PNG, WebP — max 20MB each — up to 10 images</p>}
       </div>
 
       {files.length > 0 && (
