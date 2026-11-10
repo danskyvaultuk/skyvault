@@ -154,17 +154,20 @@ describe("runAnalysisPipeline — tag-indifference (SV-046 acceptance criterion)
     expect(report).toEqual({ id: "report-1" });
   });
 
-  it("never passes tag data to analyzeRoof — that wiring is SV-048, not this ticket", async () => {
+  // BL-021 (the SV-048 wiring): each photo's roof parts now reach the analysis,
+  // in photo order, so the AI knows which photo shows which part of the roof.
+  // The aspect and capture method are still not sent.
+  it("passes each photo's roof parts to analyzeRoof in photo order", async () => {
     mockSurveyFindUnique.mockResolvedValue(
-      makeSurvey([{ roofParts: ["front"], aspect: "north", captureMethod: "drone" }])
+      makeSurvey([{ roofParts: ["front"], aspect: "north", captureMethod: "drone" }, {}, { roofParts: ["ridge", "chimney"] }])
     );
 
     await runAnalysisPipeline("survey-1");
 
     const callArgs = mockAnalyzeRoof.mock.calls[0];
+    expect(callArgs[4]).toEqual([["front"], [], ["ridge", "chimney"]]);
     const serialized = JSON.stringify(callArgs);
-    expect(serialized).not.toContain("roofParts");
-    expect(serialized).not.toContain("aspect");
+    expect(serialized).not.toContain("north");
     expect(serialized).not.toContain("captureMethod");
   });
 

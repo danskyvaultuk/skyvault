@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 // ── SV-046: per-photo tagging (+ multi-tag / aspect follow-up) ────────────────
-// Output contract for SV-048 (Claude Vision prompt wiring — not built yet):
+// Since BL-021 (the SV-048 wiring) each photo's roofParts reach the Claude
+// prompt through buildPhotoLabelsBlock below; aspect and captureMethod do not.
+// Photos uploaded under a checklist item arrive already labelled.
+// Tag contract:
 //
 //   {
 //     "photoId": "string",
@@ -70,3 +73,14 @@ export const ASPECT_LABELS: Record<Aspect, string> = {
   east: "East",
   west: "West",
 };
+
+/**
+ * The <photo_labels> block for the Claude prompt (BL-021): one line per
+ * labelled photo, by its 0-based image index, e.g. "Image 2: chimney, flashing".
+ * Unlabelled photos are left out; returns null when no photo is labelled.
+ */
+export function buildPhotoLabelsBlock(labels: readonly (readonly RoofPart[])[] | null | undefined): string | null {
+  if (!labels) return null;
+  const lines = labels.flatMap((parts, index) => (parts.length > 0 ? [`Image ${index}: ${parts.join(", ")}`] : []));
+  return lines.length > 0 ? lines.join("\n") : null;
+}

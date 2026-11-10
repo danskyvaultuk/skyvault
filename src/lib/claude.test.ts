@@ -122,3 +122,30 @@ describe("analyzeRoof — schema/parsing contract (regression guard)", () => {
     ).rejects.toThrow(/failed validation/);
   });
 });
+
+describe("analyzeRoof — photo labels (BL-021)", () => {
+  async function promptFor(labels: Parameters<typeof analyzeRoof>[4]) {
+    mockClaudeReturns(VALID_RESPONSE_JSON);
+    await analyzeRoof(["a", "b", "c"], ["image/jpeg", "image/jpeg", "image/jpeg"], undefined, null, labels);
+    const call = mockCreate.mock.calls[0][0];
+    return { text: call.messages[0].content.at(-1).text as string, system: call.system as string };
+  }
+
+  it("lists each labelled photo by its 0-based index and leaves out unlabelled ones", async () => {
+    const { text } = await promptFor([["ridge"], [], ["chimney", "flashing"]]);
+    expect(text).toContain("<photo_labels>\nImage 0: ridge\nImage 2: chimney, flashing\n</photo_labels>");
+    expect(text).not.toContain("Image 1:");
+  });
+
+  it("omits the block when no photo is labelled", async () => {
+    expect((await promptFor([[], [], []])).text).not.toContain("<photo_labels>");
+    expect((await promptFor(undefined)).text).not.toContain("<photo_labels>");
+  });
+
+  it("explains the labels in the system prompt as customer hints grounded in the images", async () => {
+    const { system } = await promptFor([["front"], [], []]);
+    expect(system).toContain("<photo_labels>");
+    expect(system).toContain("customer-supplied");
+    expect(system).toContain('"condition_score": <integer 1–10, where 10 = perfect new roof>');
+  });
+});
