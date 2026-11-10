@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getPresignedReadUrl } from "@/lib/r2";
 import { roofContextSummaryLines, type RoofContext } from "@/lib/roofContext";
 import { isReportReleased } from "@/lib/reportRelease";
+import { RooferRequestSection } from "./roofer-request";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -64,6 +65,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       property: true,
       report: true,
       images: { orderBy: { sortOrder: "asc" } },
+      lead: { select: { status: true, createdAt: true } },
     },
   });
 
@@ -268,6 +270,16 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         >
           Download PDF report
         </a>
+      )}
+
+      {/* Roofer request (BL-060): the owner of a released report only */}
+      {released && survey.customerId === session.user.id && (
+        <div className="mt-6">
+          <RooferRequestSection
+            surveyId={surveyId}
+            existing={survey.lead ? { status: survey.lead.status, createdAt: survey.lead.createdAt.toISOString() } : null}
+          />
+        </div>
       )}
 
       {/* Disclaimer */}
