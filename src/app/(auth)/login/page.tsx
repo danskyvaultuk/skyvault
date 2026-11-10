@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import Link from "next/link";
+import { journeys } from "@/lib/journeys";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -104,12 +105,16 @@ return (
                 <Link href="/register?role=customer" className="w-full border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 text-center">
                   🏠 Sign up as a homeowner
                 </Link>
-                <Link href="/register?role=roofer" className="w-full border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 text-center">
-                  🔨 Sign up as a roofer
-                </Link>
-                <Link href="/register?role=drone" className="w-full border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 text-center">
-                  🚁 Sign up as a drone operator
-                </Link>
+                {journeys.rooferEnabled && (
+                  <Link href="/register?role=roofer" className="w-full border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 text-center">
+                    🔨 Sign up as a roofer
+                  </Link>
+                )}
+                {journeys.droneEnabled && (
+                  <Link href="/register?role=drone" className="w-full border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 text-center">
+                    🚁 Sign up as a drone operator
+                  </Link>
+                )}
               </div>
             </div>
           </>
