@@ -58,7 +58,7 @@ export function RooferRequestSection({ surveyId, existing }: { surveyId: string;
       </p>
       <label className="flex items-start gap-3 text-sm text-gray-700 mb-4">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
-        <span>SkyVault may share my name, email, address and this report with a roofer.</span>
+        <span>I agree that SkyVault will share my name, email, address and this report with a roofer.</span>
       </label>
       {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
       <button

@@ -69,14 +69,24 @@ describe("POST /api/surveys/[id]/roofer-request", () => {
   });
 
   it("records one open request with the postcode and emails the admin once", async () => {
+    const before = Date.now();
     const res = await request({ consent: true });
+    const consentedAt = mockLeadCreate.mock.calls[0][0].data.createdAt as Date;
+    expect(consentedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(consentedAt.getTime()).toBeLessThanOrEqual(Date.now());
 
     expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({ status: "open" });
     expect(mockLeadCreate).toHaveBeenCalledTimes(1);
     expect(mockLeadCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { surveyId: "survey-1", reportId: "report-1", postcode: "SW1A 1AA", status: "open" },
+        data: {
+          surveyId: "survey-1",
+          reportId: "report-1",
+          postcode: "SW1A 1AA",
+          status: "open",
+          createdAt: expect.any(Date),
+        },
       })
     );
     expect(mockNotifyAdmin).toHaveBeenCalledTimes(1);

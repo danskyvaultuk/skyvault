@@ -52,7 +52,10 @@ export default async function RooferRequestsPage() {
                 </p>
               </div>
               {r.status === "open" ? (
-                <MarkHandledButton requestId={r.id} />
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">Open</span>
+                  <MarkHandledButton requestId={r.id} />
+                </div>
               ) : (
                 <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-700">Handled</span>
               )}

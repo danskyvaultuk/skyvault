@@ -32,7 +32,13 @@ export type AdminNotice = {
 export type RooferRequestDeps = {
   findSurvey(surveyId: string): Promise<RequestSurvey | null>;
   findRequest(surveyId: string): Promise<RooferRequestView | null>;
-  createRequest(data: { surveyId: string; reportId: string; postcode: string; status: "open" }): Promise<RooferRequestView>;
+  createRequest(data: {
+    surveyId: string;
+    reportId: string;
+    postcode: string;
+    status: "open";
+    createdAt: Date;
+  }): Promise<RooferRequestView>;
   notifyAdmin(notice: AdminNotice): Promise<void>;
 };
 
@@ -53,11 +59,14 @@ export class RooferRequests {
     const existing = await this.deps.findRequest(surveyId);
     if (existing) return { outcome: "exists", request: existing };
 
+    const consentedAt = new Date();
     const request = await this.deps.createRequest({
       surveyId,
       reportId: survey.report.id,
       postcode: survey.property.postcode,
       status: "open",
+      // The request is made at the moment the customer consents.
+      createdAt: consentedAt,
     });
     await this.tellAdmin(survey);
     return { outcome: "created", request };
