@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { journeys } from "@/lib/journeys";
 
 const SCORE_COLOUR = (score: number) =>
   score <= 3 ? "text-red-600" : score <= 6 ? "text-amber-500" : "text-green-600";
@@ -69,7 +70,7 @@ export default async function SurveysPage() {
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.colour}`}>
                       {badge.label}
                     </span>
-                    {claimCount > 0 && (
+                    {journeys.rooferEnabled && claimCount > 0 && (
                       <span className="text-xs text-green-600 font-medium">
                         {claimCount} roofer{claimCount !== 1 ? "s" : ""} interested
                       </span>

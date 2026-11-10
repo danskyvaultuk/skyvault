@@ -1,6 +1,8 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { NextResponse } from "next/server";
+import { journeys } from "@/lib/journeys";
+import { JourneyGuard } from "@/lib/journeyGuard";
 
 const { auth } = NextAuth(authConfig);
 
@@ -12,17 +14,16 @@ const ROLE_PREFIXES: Record<string, string> = {
 
 const CUSTOMER_PATHS = ["/dashboard", "/properties", "/surveys", "/quotes"];
 
-function getDashboard(role: string): string {
-  switch (role) {
-    case "roofer": return "/roofer/dashboard";
-    case "drone":  return "/drone/dashboard";
-    case "admin":  return "/admin/dashboard";
-    default:       return "/dashboard";
-  }
-}
+// Launch scope (BL-058): the drone and roofer journeys are switched off by default.
+const guard = new JourneyGuard(journeys);
+
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
+
+  if (guard.apiDecision(pathname) === "not-found") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const isPublic =
     pathname === "/" ||
@@ -45,17 +46,24 @@ export default auth((req) => {
 
     const role = session.user.role as string;
 
+    if (!pathname.startsWith("/api/")) {
+      const decision = guard.pageDecision(pathname, role);
+      if (decision.kind === "redirect") {
+        return NextResponse.redirect(new URL(decision.to, req.url));
+      }
+    }
+
     for (const [prefix, requiredRole] of Object.entries(ROLE_PREFIXES)) {
       if (pathname.startsWith(prefix)) {
         if (role !== requiredRole && role !== "admin") {
-          return NextResponse.redirect(new URL(getDashboard(role), req.url));
+          return NextResponse.redirect(new URL(guard.homeFor(role), req.url));
         }
       }
     }
 
     const isCustomerPath = CUSTOMER_PATHS.some((p) => pathname.startsWith(p));
     if (isCustomerPath && role !== "customer" && role !== "admin") {
-      return NextResponse.redirect(new URL(getDashboard(role), req.url));
+      return NextResponse.redirect(new URL(guard.homeFor(role), req.url));
     }
 
     return NextResponse.next();

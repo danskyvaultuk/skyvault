@@ -2,12 +2,14 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { MobileNav } from "@/components/mobile-nav";
+import { journeys } from "@/lib/journeys";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/surveys", label: "Surveys" },
   { href: "/properties", label: "Properties" },
-  { href: "/quotes", label: "My Quotes" },
+  // Launch scope (BL-058): roofer quotes only while the roofer journey is on.
+  ...(journeys.rooferEnabled ? [{ href: "/quotes", label: "My Quotes" }] : []),
 ];
 
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {

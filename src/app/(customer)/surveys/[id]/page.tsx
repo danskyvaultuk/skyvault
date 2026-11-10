@@ -6,6 +6,7 @@ import { ImageUploader } from "@/components/surveys/image-uploader";
 import { RoofContextCard, type RoofContext } from "@/components/surveys/roof-context-card";
 import { PhotoTagGrid, type TaggablePhoto } from "@/components/surveys/photo-tag-grid";
 import { DroneBookingPanel } from "./drone-booking";
+import { journeys } from "@/lib/journeys";
 
 interface DroneJob {
   id: string;
@@ -158,7 +159,8 @@ export default function SurveyPage() {
       {/* ── DRONE CAPTURE FLOW ─────────────────────────────────────────── */}
       {isDrone && (
         <>
-          {survey.status === "draft" && !droneBooked && (
+          {/* Launch scope (BL-058): no drone booking while the drone journey is off. */}
+          {survey.status === "draft" && !droneBooked && journeys.droneEnabled && (
             <DroneBookingPanel surveyId={survey.id} />
           )}
 

@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { journeys } from "@/lib/journeys";
 
 const ROLES = [
   {
@@ -28,9 +29,21 @@ const ROLES = [
 
 type Role = (typeof ROLES)[number]["id"];
 
+// Launch scope (BL-058): a role is offered only while its journey is on.
+const OFFERED_ROLES = ROLES.filter(
+  (r) =>
+    r.id === "customer" ||
+    (r.id === "roofer" && journeys.rooferEnabled) ||
+    (r.id === "drone" && journeys.droneEnabled)
+);
+
+function offeredRole(value: string | null): Role {
+  return OFFERED_ROLES.find((r) => r.id === value)?.id ?? "customer";
+}
+
 function RegisterForm() {
   const searchParams = useSearchParams();
-  const preselectedRole = (searchParams.get("role") as Role) ?? "customer";
+  const preselectedRole = offeredRole(searchParams.get("role"));
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -40,8 +53,7 @@ function RegisterForm() {
   const [registered, setRegistered] = useState(false);
 
   useEffect(() => {
-    const r = searchParams.get("role") as Role;
-    if (r && ["customer", "roofer", "drone"].includes(r)) setRole(r);
+    setRole(offeredRole(searchParams.get("role")));
   }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -106,11 +118,12 @@ function RegisterForm() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Role picker */}
+          {/* Role picker — only when more than one role is offered */}
+          {OFFERED_ROLES.length > 1 && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">I am a…</label>
             <div className="space-y-2">
-              {ROLES.map((r) => (
+              {OFFERED_ROLES.map((r) => (
                 <button
                   key={r.id}
                   type="button"
@@ -130,6 +143,7 @@ function RegisterForm() {
               ))}
             </div>
           </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full name</label>

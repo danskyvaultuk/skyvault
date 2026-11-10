@@ -15,6 +15,26 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Launch scope: journey switches
+
+SkyVault launches with one journey: a homeowner uploads their own roof photos and gets a report. The drone
+journey and the roofer journey are still in the code, but **both are switched off by default**. Nothing needs
+setting for them to be off.
+
+| Setting | Turns on | What it controls |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SKYVAULT_DRONE_JOURNEY=on` | The drone journey | Drone operator sign-up, the "Drone capture" survey type and booking deposit, the `/drone` pages, `/api/drone-jobs` and `/api/stripe/drone-checkout`. |
+| `NEXT_PUBLIC_SKYVAULT_ROOFER_JOURNEY=on` | The roofer journey | Roofer sign-up, lead emails to roofers after each report, the customer's Quotes page and roofer-interest counts, the `/roofer` pages, `/api/leads`, `/api/roofer`, `/api/stripe/checkout` and `/api/stripe/portal`. |
+
+- Only the exact value `on` turns a journey on. Any other value, or no value, leaves it off.
+- The settings are read in one place, `src/lib/journeys.ts`, and the page and API rules are in
+  `src/lib/journeyGuard.ts`.
+- They are `NEXT_PUBLIC_` settings because client pages read them, so Next.js fixes them **at build time**.
+  After changing one in Vercel, redeploy.
+- While a journey is off, an existing roofer or drone account that signs in sees a plain "not available at the
+  moment" page (`/unavailable`). No account or record is deleted, and the Stripe webhook keeps working.
+- The homepage, blog and site wording is separate and is not changed by these switches (BL-059).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

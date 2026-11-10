@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { journeys } from "@/lib/journeys";
 
 const schema = z.object({
   email: z.string().email(),
@@ -16,6 +17,14 @@ export async function POST(req: Request) {
   }
 
   const { email, name, role } = parsed.data;
+
+  // Launch scope (BL-058): roofer and drone sign-up only while their journey is on.
+  const journeyOff =
+    (role === "roofer" && !journeys.rooferEnabled) ||
+    (role === "drone" && !journeys.droneEnabled);
+  if (journeyOff) {
+    return NextResponse.json({ error: "This account type is not available at the moment." }, { status: 403 });
+  }
 
   // Check if account already exists
   const existing = await prisma.user.findUnique({ where: { email } });

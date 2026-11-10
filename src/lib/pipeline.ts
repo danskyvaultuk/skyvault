@@ -4,6 +4,7 @@ import { analyzeRoof } from "@/lib/claude";
 import { renderReportPDF } from "@/lib/pdf";
 import { distributeLeads } from "@/lib/leads";
 import { notifyCustomerReportReady } from "@/lib/resend";
+import { journeys } from "@/lib/journeys";
 import { RoofContextSchema } from "@/lib/roofContext";
 import sharp from "sharp";
 
@@ -126,11 +127,13 @@ export async function runAnalysisPipeline(surveyId: string) {
       data: { status: "complete" },
     });
 
-    // ── Step 9: Distribute leads ───────────────────────────────────────────
-    try {
-      await distributeLeads(surveyId, report.id, survey.property.postcode);
-    } catch (err) {
-      console.error("[pipeline] Lead distribution failed:", err);
+    // ── Step 9: Distribute leads (only while the roofer journey is on, BL-058) ─
+    if (journeys.rooferEnabled) {
+      try {
+        await distributeLeads(surveyId, report.id, survey.property.postcode);
+      } catch (err) {
+        console.error("[pipeline] Lead distribution failed:", err);
+      }
     }
 
     // ── Step 10: Notify customer ───────────────────────────────────────────
