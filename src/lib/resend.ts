@@ -92,3 +92,34 @@ export async function notifyCustomerReportReady({
     `,
   });
 }
+
+// A customer asked to be put in touch with a roofer (BL-060).
+export async function notifyAdminRooferRequest({
+  to,
+  customerName,
+  customerEmail,
+  address,
+  postcode,
+  surveyId,
+}: {
+  to: string;
+  customerName: string;
+  customerEmail: string;
+  address: string;
+  postcode: string;
+  surveyId: string;
+}) {
+  const reportUrl = appLink(`/surveys/${surveyId}/report`);
+  const requestsUrl = appLink("/admin/roofer-requests");
+
+  await sendEmail({
+    to,
+    subject: `Roofer request: ${address}, ${postcode} — SkyVault`,
+    html: `
+      <p>A customer has asked to be put in touch with a roofer, and agreed that SkyVault may share their name, email, address and report.</p>
+      <p><strong>${customerName || "(no name)"}</strong> — ${customerEmail}<br/>${address}, ${postcode}</p>
+      <p><a href="${reportUrl}">View the report →</a></p>
+      <p><a href="${requestsUrl}">All roofer requests →</a></p>
+    `,
+  });
+}
