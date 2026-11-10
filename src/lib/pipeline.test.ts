@@ -15,6 +15,7 @@ const mockUploadBuffer = vi.fn();
 const mockDistributeLeads = vi.fn();
 const mockNotifyCustomer = vi.fn();
 const mockRenderReportPDF = vi.fn();
+const switches = { droneEnabled: false, rooferEnabled: false };
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -45,6 +46,8 @@ vi.mock("@/lib/pdf", () => ({
 vi.mock("@/lib/leads", () => ({
   distributeLeads: (...args: unknown[]) => mockDistributeLeads(...args),
 }));
+
+vi.mock("@/lib/journeys", () => ({ journeys: switches }));
 
 vi.mock("@/lib/resend", () => ({
   notifyCustomerReportReady: (...args: unknown[]) => mockNotifyCustomer(...args),
@@ -108,6 +111,7 @@ beforeEach(() => {
   mockAnalyzeRoof.mockReset().mockResolvedValue(VALID_ANALYSIS);
   mockUploadBuffer.mockReset();
   mockDistributeLeads.mockReset().mockResolvedValue({ id: "lead-1" });
+  switches.rooferEnabled = false;
   mockNotifyCustomer.mockReset().mockResolvedValue(undefined);
   mockRenderReportPDF.mockReset().mockResolvedValue(Buffer.from("fake-pdf"));
 });
@@ -200,5 +204,28 @@ describe("runAnalysisPipeline — customer notes & roof Q&A reach the PDF", () =
     const call = mockRenderReportPDF.mock.calls[0];
     expect(call[4]).toBeNull();
     expect(call[5]).toBeNull();
+  });
+});
+
+describe("runAnalysisPipeline — lead distribution follows the roofer journey (BL-058)", () => {
+  it("does not distribute leads while the roofer journey is off, and still completes the report", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+
+    const report = await runAnalysisPipeline("survey-1");
+
+    expect(report).toEqual({ id: "report-1" });
+    expect(mockDistributeLeads).not.toHaveBeenCalled();
+    expect(mockSurveyUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "complete" }) })
+    );
+  });
+
+  it("distributes leads while the roofer journey is on", async () => {
+    switches.rooferEnabled = true;
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+
+    await runAnalysisPipeline("survey-1");
+
+    expect(mockDistributeLeads).toHaveBeenCalledWith("survey-1", "report-1", "SW1A 1AA");
   });
 });

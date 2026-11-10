@@ -34,10 +34,12 @@ export default async function CustomerDashboard() {
         lead: { include: { _count: { select: { claims: true } } } },
       },
     }),
-    // Count total roofer claims across all this customer's leads
-    prisma.leadClaim.count({
-      where: { lead: { survey: { customerId: userId } } },
-    }),
+    // Count total roofer claims across all this customer's leads (roofer journey only, BL-058)
+    journeys.rooferEnabled
+      ? prisma.leadClaim.count({
+          where: { lead: { survey: { customerId: userId } } },
+        })
+      : Promise.resolve(0),
   ]);
 
   const completedSurveys = recentSurveys.filter((s) => s.status === "complete");
@@ -52,11 +54,11 @@ export default async function CustomerDashboard() {
       <p className="text-gray-500 mb-8">
         {isNewUser
           ? "Get started by adding your first property."
-          : `${properties.length} propert${properties.length !== 1 ? "ies" : "y"} · ${recentSurveys.length} survey${recentSurveys.length !== 1 ? "s" : ""} · ${activeClaims} roofer interest${activeClaims !== 1 ? "s" : ""}`}
+          : `${properties.length} propert${properties.length !== 1 ? "ies" : "y"} · ${recentSurveys.length} survey${recentSurveys.length !== 1 ? "s" : ""}${journeys.rooferEnabled ? ` · ${activeClaims} roofer interest${activeClaims !== 1 ? "s" : ""}` : ""}`}
       </p>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+      <div className={`grid grid-cols-1 gap-4 mb-10 ${journeys.rooferEnabled ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <Link
           href="/surveys/new"
           className="bg-blue-700 text-white rounded-xl p-6 hover:bg-blue-800 transition"
@@ -73,6 +75,7 @@ export default async function CustomerDashboard() {
           <p className="font-semibold text-gray-900">Add property</p>
           <p className="text-sm text-gray-500 mt-0.5">Register a new address</p>
         </Link>
+        {journeys.rooferEnabled && (
         <Link
           href="/quotes"
           className="bg-white border rounded-xl p-6 hover:bg-gray-50 transition relative"
@@ -86,6 +89,7 @@ export default async function CustomerDashboard() {
             </span>
           )}
         </Link>
+        )}
       </div>
 
       {/* New user guide */}
@@ -138,7 +142,7 @@ export default async function CustomerDashboard() {
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.colour}`}>
                         {badge.label}
                       </span>
-                      {claimCount > 0 && (
+                      {journeys.rooferEnabled && claimCount > 0 && (
                         <span className="text-xs text-green-600 font-medium">
                           {claimCount} roofer{claimCount !== 1 ? "s" : ""} interested
                         </span>
@@ -179,7 +183,7 @@ export default async function CustomerDashboard() {
 
       {/* Summary stats — only when there's data */}
       {completedSurveys.length > 0 && (
-        <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
+        <div className={`grid gap-4 ${journeys.rooferEnabled ? "grid-cols-3" : "grid-cols-2"}`}>
           <div className="bg-white border rounded-xl px-5 py-4 text-center">
             <p className="text-2xl font-bold text-gray-900">{properties.length}</p>
             <p className="text-xs text-gray-500 mt-0.5">Properties</p>
@@ -188,10 +192,12 @@ export default async function CustomerDashboard() {
             <p className="text-2xl font-bold text-gray-900">{completedSurveys.length}</p>
             <p className="text-xs text-gray-500 mt-0.5">Reports</p>
           </div>
+          {journeys.rooferEnabled && (
           <div className="bg-white border rounded-xl px-5 py-4 text-center">
             <p className="text-2xl font-bold text-gray-900">{activeClaims}</p>
             <p className="text-xs text-gray-500 mt-0.5">Roofer interests</p>
           </div>
+          )}
         </div>
       )}
     </div>
