@@ -7,6 +7,11 @@ const APP_URL = appBaseUrl({
   VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL,
 });
 
+// Every link in a SkyVault email is built here, from the live base address.
+function appLink(path: string): string {
+  return `${APP_URL}${path}`;
+}
+
 async function sendEmail({
   to,
   subject,
@@ -50,7 +55,7 @@ export async function notifyRooferNewLead({
   leadId: string;
   postcode: string;
 }) {
-  const leadUrl = `${APP_URL}/roofer/leads/${leadId}`;
+  const leadUrl = appLink(`/roofer/leads/${leadId}`);
 
   await sendEmail({
     to: rooferEmail,
@@ -74,7 +79,7 @@ export async function notifyCustomerReportReady({
   customerName: string;
   surveyId: string;
 }) {
-  const reportUrl = `${APP_URL}/surveys/${surveyId}/report`;
+  const reportUrl = appLink(`/surveys/${surveyId}/report`);
 
   await sendEmail({
     to: customerEmail,
