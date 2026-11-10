@@ -1,6 +1,16 @@
+import { appBaseUrl } from "@/lib/appUrl";
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "noreply@skyvaultuk.com";
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const APP_URL = appBaseUrl({
+  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+});
+
+// Every link in a SkyVault email is built here, from the live base address.
+function appLink(path: string): string {
+  return `${APP_URL}${path}`;
+}
 
 async function sendEmail({
   to,
@@ -45,7 +55,7 @@ export async function notifyRooferNewLead({
   leadId: string;
   postcode: string;
 }) {
-  const leadUrl = `${APP_URL}/roofer/leads/${leadId}`;
+  const leadUrl = appLink(`/roofer/leads/${leadId}`);
 
   await sendEmail({
     to: rooferEmail,
@@ -69,7 +79,7 @@ export async function notifyCustomerReportReady({
   customerName: string;
   surveyId: string;
 }) {
-  const reportUrl = `${APP_URL}/surveys/${surveyId}/report`;
+  const reportUrl = appLink(`/surveys/${surveyId}/report`);
 
   await sendEmail({
     to: customerEmail,
