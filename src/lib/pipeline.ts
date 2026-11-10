@@ -57,7 +57,9 @@ export async function runAnalysisPipeline(surveyId: string) {
       imageData.map((d) => d.base64),
       imageData.map((d) => d.mimeType),
       survey.notes ?? undefined,
-      roofContext
+      roofContext,
+      // Which part of the roof each photo shows, in photo order (BL-021).
+      survey.images.map((img) => img.roofParts)
     );
     console.log(`[pipeline] Got score: ${analysis.condition_score}/10`);
 

@@ -2,13 +2,21 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ROOF_PARTS, type RoofPart } from "@/lib/photoTag";
 
 const registerSchema = z.object({
   s3Key: z.string().min(1),
   originalFilename: z.string().optional(),
   mimeType: z.string().default("image/jpeg"),
   sizeBytes: z.number().optional(),
+  // A photo uploaded under a checklist item arrives labelled with its roof parts (BL-021).
+  roofParts: z.array(z.enum(ROOF_PARTS)).max(ROOF_PARTS.length).optional(),
 });
+
+// A checklist upload is saved labelled, with the time it was labelled (BL-021).
+function checklistLabel(roofParts: RoofPart[] | undefined) {
+  return roofParts?.length ? { roofParts, taggedAt: new Date() } : {};
+}
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -56,6 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       mimeType: parsed.data.mimeType,
       sizeBytes: parsed.data.sizeBytes,
       sortOrder: survey._count.images,
+      ...checklistLabel(parsed.data.roofParts),
     },
   });
 

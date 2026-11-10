@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ImageUploader } from "@/components/surveys/image-uploader";
+import { PhotoChecklist } from "@/components/surveys/photo-checklist";
+import { checklistStatus, missingLabels, type ChecklistId } from "@/lib/photoChecklist";
 import { RoofContextCard, type RoofContext } from "@/components/surveys/roof-context-card";
 import { PhotoTagGrid, type TaggablePhoto } from "@/components/surveys/photo-tag-grid";
 import { DroneBookingPanel } from "./drone-booking";
@@ -57,6 +58,12 @@ export default function SurveyPage() {
   const [error, setError] = useState("");
   const [notes, setNotes] = useState("");
   const [notesSaved, setNotesSaved] = useState(false);
+  // Checklist items the customer says don't apply to their roof (BL-021). Kept for this visit only.
+  const [notApplicable, setNotApplicable] = useState<ChecklistId[]>([]);
+
+  function toggleNotApplicable(itemId: ChecklistId) {
+    setNotApplicable((prev) => (prev.includes(itemId) ? prev.filter((x) => x !== itemId) : [...prev, itemId]));
+  }
 
   function fetchSurvey() {
     return fetch(`/api/surveys/${id}`)
@@ -100,6 +107,12 @@ export default function SurveyPage() {
   }
 
   async function handleAnalyse() {
+    // Missing checklist shots warn but never block (BL-021).
+    const missing = survey ? missingLabels(checklistStatus(survey.images, notApplicable)) : [];
+    if (missing.length > 0) {
+      const list = missing.join(", ").toLowerCase();
+      if (!confirm(`You haven't added photos of: ${list}. The report may miss problems there. Analyse anyway?`)) return;
+    }
     setAnalysing(true);
     setError("");
     const res = await fetch(`/api/surveys/${id}/analyse`, { method: "POST" });
@@ -249,10 +262,15 @@ export default function SurveyPage() {
                 <h2 className="text-base font-semibold text-gray-900">Upload roof images</h2>
               </div>
               <p className="text-sm text-gray-500 mb-4">
-                Upload clear photos of the roof from different angles. Include close-ups of any
-                areas you&apos;re concerned about.
+                Work through the checklist: add clear photos for each part of the roof. If a part
+                doesn&apos;t apply to your roof, mark it not applicable.
               </p>
-              <ImageUploader surveyId={id} onUploadComplete={handleUploadComplete} />
+              <PhotoChecklist
+                surveyId={id}
+                status={checklistStatus(survey.images, notApplicable)}
+                onToggleNotApplicable={toggleNotApplicable}
+                onUploadComplete={handleUploadComplete}
+              />
             </div>
           )}
 

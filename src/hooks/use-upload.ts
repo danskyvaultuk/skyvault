@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import type { RoofPart } from "@/lib/photoTag";
 
 export interface UploadFile {
   file: File;
@@ -10,7 +11,7 @@ export interface UploadFile {
   error?: string;
 }
 
-export function useUpload(surveyId: string) {
+export function useUpload(surveyId: string, roofParts?: readonly RoofPart[]) {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -67,6 +68,8 @@ export function useUpload(surveyId: string) {
                     originalFilename: file.name,
                     mimeType: file.type,
                     sizeBytes: file.size,
+                    // Labelled with its checklist item, when uploaded under one (BL-021).
+                    ...(roofParts?.length ? { roofParts } : {}),
                   }),
                 });
                 updateFile(index, { status: "done", progress: 100, s3Key });
@@ -91,7 +94,7 @@ export function useUpload(surveyId: string) {
 
     setUploading(false);
     return results.reduce((sum: number, n: number) => sum + n, 0);
-  }, [files, surveyId]);
+  }, [files, surveyId, roofParts]);
 
   const removeFile = useCallback((index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
