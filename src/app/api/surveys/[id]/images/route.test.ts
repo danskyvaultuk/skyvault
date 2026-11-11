@@ -3,12 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockAuth = vi.fn();
 const mockSurveyFindUnique = vi.fn();
 const mockImageCreate = vi.fn();
+const mockImageFindMany = vi.fn();
 
 vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     survey: { findUnique: (...args: unknown[]) => mockSurveyFindUnique(...args) },
-    image: { create: (...args: unknown[]) => mockImageCreate(...args) },
+    image: { create: (...args: unknown[]) => mockImageCreate(...args), findMany: (...args: unknown[]) => mockImageFindMany(...args) },
   },
 }));
 
@@ -20,6 +21,7 @@ vi.mock("@/lib/photoQuality", async (importOriginal) => ({
 }));
 
 const { POST } = await import("./route");
+const { GET } = await import("./route");
 
 const ACCEPTED = { outcome: "accepted", width: 4032, height: 3024, sharpness: 312.5 };
 const mockFetch = vi.fn();
@@ -119,5 +121,71 @@ describe("POST /api/surveys/[id]/images — photo quality (BL-018)", () => {
     const res = await register({});
     expect(res.status).toBe(403);
     expect(mockAssess).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/surveys/[id]/images — who may list a survey's photos", () => {
+  const FIXTURE_IMAGES = [{ id: "img-a", surveyId: "survey-1" }, { id: "img-b", surveyId: "survey-1" }];
+
+  function list() {
+    return GET(new Request("http://localhost/api/surveys/survey-1/images"), {
+      params: Promise.resolve({ id: "survey-1" }),
+    });
+  }
+
+  beforeEach(() => {
+    mockImageFindMany.mockReset().mockResolvedValue(FIXTURE_IMAGES);
+  });
+
+  it("answers 401 with no session and reads nothing", async () => {
+    mockAuth.mockResolvedValue(null);
+    const res = await list();
+    expect(res.status).toBe(401);
+    expect(mockImageFindMany).not.toHaveBeenCalled();
+  });
+
+  it("answers 404 for a survey that does not exist and reads no photos", async () => {
+    mockSurveyFindUnique.mockResolvedValue(null);
+    const res = await list();
+    expect(res.status).toBe(404);
+    expect(mockImageFindMany).not.toHaveBeenCalled();
+  });
+
+  it("answers 403 to a signed-in customer who does not own the survey", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "cust-2", role: "customer" } });
+    const res = await list();
+    expect(res.status).toBe(403);
+    expect(mockImageFindMany).not.toHaveBeenCalled();
+    expect(await res.json()).not.toEqual(FIXTURE_IMAGES);
+  });
+
+  it("answers 403 to a drone-role caller who is not the job's operator", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "drone-2", role: "drone" } });
+    mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", droneJob: { operatorId: "drone-1" } });
+    const res = await list();
+    expect(res.status).toBe(403);
+    expect(mockImageFindMany).not.toHaveBeenCalled();
+  });
+
+  it("returns the photos to the owner", async () => {
+    const res = await list();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(FIXTURE_IMAGES);
+    expect(mockImageFindMany.mock.calls[0][0].where).toEqual({ surveyId: "survey-1" });
+  });
+
+  it("returns the photos to an admin", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "admin-1", role: "admin" } });
+    const res = await list();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(FIXTURE_IMAGES);
+  });
+
+  it("returns the photos to the drone operator assigned to the survey's job", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "drone-1", role: "drone" } });
+    mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", droneJob: { operatorId: "drone-1" } });
+    const res = await list();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(FIXTURE_IMAGES);
   });
 });
