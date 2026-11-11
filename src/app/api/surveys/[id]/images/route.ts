@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ROOF_PARTS, type RoofPart } from "@/lib/photoTag";
+import { checkUploadedPhoto } from "@/lib/uploadCheck";
 
 const registerSchema = z.object({
   s3Key: z.string().min(1),
@@ -55,6 +56,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  // Too small or too blurry: not saved, and the customer is told how to retake it (BL-018).
+  const check = await checkUploadedPhoto(surveyId, parsed.data.s3Key);
+  if (check.kind === "rejected") {
+    return NextResponse.json({ error: check.guidance, reason: check.reason, guidance: check.guidance }, { status: 422 });
+  }
+
   const image = await prisma.image.create({
     data: {
       surveyId,
@@ -65,6 +72,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       sizeBytes: parsed.data.sizeBytes,
       sortOrder: survey._count.images,
       ...checklistLabel(parsed.data.roofParts),
+      ...check.validation,
     },
   });
 

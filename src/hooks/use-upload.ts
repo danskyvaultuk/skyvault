@@ -60,7 +60,7 @@ export function useUpload(surveyId: string, roofParts?: readonly RoofPart[]) {
             };
             xhr.onload = async () => {
               if (xhr.status >= 200 && xhr.status < 300) {
-                await fetch(`/api/surveys/${surveyId}/images`, {
+                const registered = await fetch(`/api/surveys/${surveyId}/images`, {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -72,6 +72,13 @@ export function useUpload(surveyId: string, roofParts?: readonly RoofPart[]) {
                     ...(roofParts?.length ? { roofParts } : {}),
                   }),
                 });
+                // A photo the server refuses (too small or blurry, BL-018) is not
+                // uploaded: show its guidance on this file and count it as failed.
+                if (!registered.ok) {
+                  const refusal = await registered.json().catch(() => ({}));
+                  reject(new Error(refusal.guidance ?? refusal.error ?? "This photo couldn't be added. Please try again."));
+                  return;
+                }
                 updateFile(index, { status: "done", progress: 100, s3Key });
                 resolve();
               } else {
