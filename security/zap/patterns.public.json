@@ -1,0 +1,18 @@
+[
+  { "id": "cookie-header", "regex": "(?<![A-Za-z-])Cookie[ \\t]*:[ \\t]*[A-Za-z0-9_.-]+=[A-Za-z0-9._~+/%=-]{16,}", "flags": "i" },
+  { "id": "set-cookie-header", "regex": "Set-Cookie[ \\t]*:[ \\t]*[A-Za-z0-9_.-]+=[A-Za-z0-9._~+/%=-]{16,}", "flags": "i" },
+  { "id": "bearer-token", "regex": "(?<![A-Za-z0-9])Bearer[ \\t]+[A-Za-z0-9._~+/=-]{16,}", "flags": "i" },
+  { "id": "jwt", "regex": "(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}(?![A-Za-z0-9_-]|\\.[A-Za-z0-9_-])", "flags": "" },
+  { "id": "jwe", "regex": "(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}", "flags": "" },
+  { "id": "home-path-users", "regex": "/Users/[A-Za-z0-9._-]+", "flags": "" },
+  { "id": "home-path-home", "regex": "/home/[A-Za-z0-9._-]+", "flags": "" },
+  { "id": "aws-account-id", "regex": "(?<![0-9a-fA-F])\\d{12}(?![0-9a-fA-F])", "flags": "" },
+  { "id": "gbp-amount", "regex": "\\u00a3[ \\t]?[0-9][0-9,]*(\\.[0-9]+)?", "flags": "" },
+  { "id": "email-not-example-test", "regex": "(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@(?!example\\.test(?![A-Za-z0-9.-]))[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+", "flags": "" },
+  { "id": "aws-access-key", "regex": "(?<![A-Za-z0-9])AKIA[0-9A-Z]{16}", "flags": "" },
+  { "id": "stripe-live-key", "regex": "(?<![A-Za-z0-9])sk_live_[A-Za-z0-9]{8,}", "flags": "" },
+  { "id": "stripe-test-key", "regex": "(?<![A-Za-z0-9])sk_test_[A-Za-z0-9]{8,}", "flags": "" },
+  { "id": "stripe-webhook-secret", "regex": "(?<![A-Za-z0-9])whsec_[A-Za-z0-9]{8,}", "flags": "" },
+  { "id": "anthropic-key", "regex": "(?<![A-Za-z0-9])sk-ant-[A-Za-z0-9_-]{8,}", "flags": "" },
+  { "id": "resend-key", "regex": "(?<![A-Za-z0-9])re_[A-Za-z0-9]{8,}", "flags": "" }
+]
