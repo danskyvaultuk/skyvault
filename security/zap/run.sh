@@ -121,6 +121,64 @@ wait_for_app() {
   done
 }
 
+# Runs one of the harness scripts in the app image on the internal network, with the throwaway database.
+seed() {
+  sv_run --rm \
+    -e DATABASE_URL="$SV_ZAP_DB_URL" \
+    -e DIRECT_URL="$SV_ZAP_DB_URL" \
+    -e CHECKPOINT_DISABLE=1 \
+    "$SV_ZAP_IMAGE" node security/zap/seed.mjs
+}
+
+# mint <seed user> <cookie name>: prints "<cookie name>=<token>", signed with this run's AUTH_SECRET.
+mint() {
+  sv_run --rm -e AUTH_SECRET="$AUTH_SECRET" "$SV_ZAP_IMAGE" \
+    node security/zap/mint-session.mjs --user "$1" --cookie-name "$2"
+}
+
+# probe <cookie> <seed user>: exit 0 only when the session endpoint names that user's id and role.
+probe() {
+  sv_run --rm -e SV_SESSION_COOKIE="$1" "$SV_ZAP_IMAGE" node security/zap/session-control.mjs --probe --user "$2"
+}
+
+# The cookie name is settled once, before the A01 requests and before any authenticated plan: the first name
+# that opens customer A's session is used by every later mint. When neither does, the run stops.
+settle_cookie() {
+  for name in authjs.session-token __Secure-authjs.session-token; do
+    if cookie="$(mint customerA "$name")" && probe "$cookie" customerA; then
+      SV_COOKIE_NAME="$name"
+      echo "run.sh: session cookie name settled as $SV_COOKIE_NAME"
+      return 0
+    fi
+  done
+  echo "run.sh: neither cookie name opens a session; no A01 request and no authenticated plan will run" >&2
+  return 1
+}
+
+# session_cookie <customer|admin>: the settled-name cookie for that identity's seeded user.
+session_cookie() {
+  case "$1" in
+    customer) mint customerA "$SV_COOKIE_NAME" ;;
+    admin) mint admin "$SV_COOKIE_NAME" ;;
+    *) echo "run.sh: unknown identity $1" >&2; return 2 ;;
+  esac
+}
+
+# session_control <customer|admin> <before|after>: GET /api/auth/session with and without the identity's cookie.
+session_control() {
+  cookie="$(session_cookie "$1")"
+  sv_run --rm -e SV_SESSION_COOKIE="$cookie" "$SV_ZAP_IMAGE" \
+    node security/zap/session-control.mjs --identity "$1" --phase "$2" >"$SV_ZAP_OUT/session-control-$1-$2.json"
+}
+
+# a01: the cross-account requests. A non-zero exit (a customer-A GET that was not 2xx) stops the run.
+a01() {
+  cookie_a="$(mint customerA "$SV_COOKIE_NAME")"
+  cookie_b="$(mint customerB "$SV_COOKIE_NAME")"
+  sv_run --rm -e SV_COOKIE_CUSTOMER_A="$cookie_a" -e SV_COOKIE_CUSTOMER_B="$cookie_b" "$SV_ZAP_IMAGE" \
+    node security/zap/a01-requests.mjs >"$SV_ZAP_OUT/a01-requests.json"
+}
+
 # The throwaway signing secret exists only in this shell variable, for this run.
 AUTH_SECRET="$(openssl rand -base64 32)"
 mkdir -p "$SV_ZAP_OUT"
