@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { runAnalysisPipeline } from "@/lib/pipeline";
@@ -38,13 +39,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  try {
-    const report = await runAnalysisPipeline(surveyId);
-    return NextResponse.json({ reportId: report.id });
-  } catch {
-    return NextResponse.json(
-      { error: "Analysis failed. Please try again." },
-      { status: 500 }
-    );
-  }
+  // Background analysis (BL-023): every report waits for the admin anyway
+  // (BL-061), so the customer is answered at once. waitUntil keeps the
+  // function alive until the pipeline finishes; a failure marks the survey
+  // "failed" inside the pipeline, so the customer can retry.
+  await prisma.survey.update({ where: { id: surveyId }, data: { status: "analysing" } });
+  waitUntil(
+    runAnalysisPipeline(surveyId).then(
+      () => undefined,
+      (err) => console.error(`[analyse] Analysis failed for survey ${surveyId}:`, err)
+    )
+  );
+  return NextResponse.json({ status: "analysing" }, { status: 202 });
 }

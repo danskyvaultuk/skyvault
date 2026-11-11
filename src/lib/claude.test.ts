@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockCreate = vi.fn();
 
@@ -256,5 +256,55 @@ describe("analyzeRoof — review flags and peripheral zones (BL-010 / BL-004)", 
     expect(system).toContain('"zone": "<eaves|wall_junction|fascia|upstand|drainage_point|protrusion|none');
     expect(system).toMatch(/Shadow is not felt or a flat roof/);
     expect(system).toContain('"condition_score": <integer 1–10, where 10 = perfect new roof>');
+  });
+});
+
+describe("analyzeRoof — the analysis model (BL-067)", () => {
+  const ORIGINAL = process.env.SKYVAULT_ANALYSIS_MODEL;
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env.SKYVAULT_ANALYSIS_MODEL;
+    else process.env.SKYVAULT_ANALYSIS_MODEL = ORIGINAL;
+  });
+
+  it("asks Claude Opus 5.5 at high effort by default, with no sampling setting", async () => {
+    delete process.env.SKYVAULT_ANALYSIS_MODEL;
+    mockClaudeReturns(VALID_RESPONSE_JSON);
+    await analyzeRoof(["a"], ["image/jpeg"]);
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.model).toBe("claude-opus-5-5");
+    expect(call.output_config).toEqual({ effort: "high" });
+    expect(call.max_tokens).toBeGreaterThanOrEqual(16000);
+    expect(call).not.toHaveProperty("temperature");
+  });
+
+  it("uses the model setting, and sends no effort level to a model that rejects it", async () => {
+    process.env.SKYVAULT_ANALYSIS_MODEL = "claude-sonnet-4-5";
+    mockClaudeReturns(VALID_RESPONSE_JSON);
+    await analyzeRoof(["a"], ["image/jpeg"]);
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.model).toBe("claude-sonnet-4-5");
+    expect(call).not.toHaveProperty("output_config");
+  });
+
+  it("parses the answer's text and ignores the model's thinking", async () => {
+    mockCreate.mockResolvedValueOnce({
+      stop_reason: "end_turn",
+      content: [
+        { type: "thinking", thinking: "", signature: "sig" },
+        { type: "text", text: JSON.stringify(VALID_RESPONSE_JSON) },
+      ],
+    });
+    const result = await analyzeRoof(["a"], ["image/jpeg"]);
+    expect(result.condition_score).toBe(VALID_RESPONSE_JSON.condition_score);
+  });
+
+  it("fails naming the reason when the model declines", async () => {
+    mockCreate.mockResolvedValueOnce({ stop_reason: "refusal", content: [] });
+    await expect(analyzeRoof(["a"], ["image/jpeg"])).rejects.toThrow(/refusal/);
+  });
+
+  it("fails naming the reason when the answer is cut short", async () => {
+    mockCreate.mockResolvedValueOnce({ stop_reason: "max_tokens", content: [{ type: "text", text: '{"condition_score": 7' }] });
+    await expect(analyzeRoof(["a"], ["image/jpeg"])).rejects.toThrow(/max_tokens/);
   });
 });
