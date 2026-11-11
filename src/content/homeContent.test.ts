@@ -66,4 +66,12 @@ describe("homeContent — switched sections (SPEC-018 B)", () => {
     expect(content.showDroneOperatorSection).toBe(false);
     expect(content.footerLinks.map((l) => l.href)).toEqual(["#roofers", "/login"]);
   });
+
+  it("shows both journeys' sections, the drone card and both footer links when both are on", () => {
+    const content = homeContent({ droneEnabled: true, rooferEnabled: true });
+    expect(content.showDroneOperatorSection).toBe(true);
+    expect(content.showRooferSection).toBe(true);
+    expect(content.pricing.plans.map((p) => p.name)).toEqual(["Self upload", "Drone Capture"]);
+    expect(content.footerLinks.map((l) => l.href)).toEqual(["#roofers", "#operators", "/login"]);
+  });
 });
