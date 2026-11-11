@@ -1,6 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from "@react-pdf/renderer";
 import React from "react";
-import type { RoofAnalysis } from "./claude";
+import type { ReportAnalysis } from "./claude";
 import { roofContextSummaryLines, type RoofContext } from "./roofContext";
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ function ReportDocument({
   customerNotes,
   roofContext,
 }: {
-  analysis: RoofAnalysis;
+  analysis: ReportAnalysis;
   address: string;
   postcode: string;
   generatedAt: string;
@@ -259,7 +259,7 @@ function ReportDocument({
 
 // ── Export ─────────────────────────────────────────────────────────────────────
 export async function renderReportPDF(
-  analysis: RoofAnalysis,
+  analysis: ReportAnalysis,
   address: string,
   postcode: string,
   imageBase64s?: string[],

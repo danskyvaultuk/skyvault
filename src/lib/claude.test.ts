@@ -19,6 +19,10 @@ const VALID_RESPONSE_JSON = {
       severity: "low",
       description: "Light moss on north-facing slope",
       image_index: 0,
+      priority: "low",
+      category: "cosmetic",
+      extent: "moderate",
+      location: "upper half of the photo, across the tiles",
     },
   ],
   estimated_remaining_life_years: 15,
@@ -147,5 +151,56 @@ describe("analyzeRoof — photo labels (BL-021)", () => {
     expect(system).toContain("<photo_labels>");
     expect(system).toContain("customer-supplied");
     expect(system).toContain('"condition_score": <integer 1–10, where 10 = perfect new roof>');
+  });
+});
+
+describe("analyzeRoof — defect priority, location and the rubric (BL-003 / BL-009)", () => {
+  const withDefect = (defect: Record<string, unknown>, score = 8) => ({
+    ...VALID_RESPONSE_JSON,
+    condition_score: score,
+    defects: [defect],
+  });
+  const FUNCTIONAL = {
+    type: "flashing_damage",
+    severity: "high",
+    description: "Lifted lead flashing at the chimney",
+    image_index: 1,
+    priority: "urgent",
+    category: "functional",
+    extent: "small",
+    location: "right of the chimney, at the base",
+  };
+
+  it("parses a defect carrying priority, category, extent and location", async () => {
+    mockClaudeReturns(withDefect({ ...FUNCTIONAL, priority: "medium" }, 6));
+    const result = await analyzeRoof(["a", "b"], ["image/jpeg", "image/jpeg"]);
+    expect(result.defects[0]).toMatchObject({ priority: "medium", category: "functional", extent: "small" });
+  });
+
+  it.each(["priority", "category", "extent", "location"])("refuses a defect missing %s", async (field) => {
+    const defect: Record<string, unknown> = { ...FUNCTIONAL };
+    delete defect[field];
+    mockClaudeReturns(withDefect(defect));
+    await expect(analyzeRoof(["a", "b"], ["image/jpeg", "image/jpeg"])).rejects.toThrow();
+  });
+
+  it("returns the score capped, keeping the AI's own score", async () => {
+    mockClaudeReturns(withDefect(FUNCTIONAL, 8));
+    const result = await analyzeRoof(["a", "b"], ["image/jpeg", "image/jpeg"]);
+    expect(result.condition_score).toBe(3);
+    expect(result.ai_condition_score).toBe(8);
+  });
+
+  it("carries the rubric, the new fields and the location rule in the system prompt", async () => {
+    mockClaudeReturns(VALID_RESPONSE_JSON);
+    await analyzeRoof(["a"], ["image/jpeg"]);
+    const system = mockCreate.mock.calls[0][0].system as string;
+    for (let score = 1; score <= 10; score++) expect(system).toMatch(new RegExp(`\\n  ${score} = `));
+    expect(system).toContain('"priority": "<low|medium|high|urgent');
+    expect(system).toContain('"category": "<cosmetic|functional');
+    expect(system).toContain('"extent": "<small|moderate|large');
+    expect(system).toContain('"location":');
+    expect(system).toMatch(/never state a slope as measured/i);
+    expect(system).toContain('"type": "<missing_tiles|cracked_tiles|moss_growth|flashing_damage|gutter_damage|ridge_damage|valley_damage|other>"');
   });
 });

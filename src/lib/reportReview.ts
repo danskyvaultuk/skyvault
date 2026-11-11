@@ -3,7 +3,7 @@
 // customer's "report ready" email is sent. The AI's original answer
 // (`rawAiResponse`) is never changed, so corrections can be compared with it.
 import type { ReportStatus } from "@prisma/client";
-import type { RoofAnalysis } from "@/lib/claude";
+import type { ReportAnalysis, RoofAnalysis } from "@/lib/claude";
 import { RoofContextSchema, type RoofContext } from "@/lib/roofContext";
 import { isReportReleased } from "@/lib/reportRelease";
 import { ReportCorrectionSchema, type ReportCorrection } from "@/lib/reportCorrection";
@@ -44,7 +44,7 @@ export type ReportReviewDeps = {
   updateReport(id: string, data: ReportUpdate): Promise<void>;
   fetchPhotos(photos: SurveyPhoto[]): Promise<PreparedPhoto[]>;
   renderPdf(
-    analysis: RoofAnalysis,
+    analysis: ReportAnalysis,
     address: string,
     postcode: string,
     imageBase64s: string[],
@@ -162,7 +162,7 @@ export class ReportReview {
     return key;
   }
 
-  private correctedAnalysis(report: ReviewReport, correction: ReportCorrection): RoofAnalysis {
+  private correctedAnalysis(report: ReviewReport, correction: ReportCorrection): ReportAnalysis {
     const ai = aiAnswer(report);
     return {
       condition_score: correction.conditionScore,
