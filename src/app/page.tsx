@@ -1,15 +1,45 @@
 import Link from "next/link";
+import { journeys } from "@/lib/journeys";
+import { homeContent, type Plan } from "@/content/homeContent";
+import { visibleBlogPosts } from "@/content/blogVisibility";
+import { blogPosts } from "@/data/blogPosts";
+
+// The words come from src/content/homeContent.ts (BL-059): at launch they
+// describe the self-upload journey only, and the drone and roofer sections
+// render only while their journey switch is on (BL-058).
+function PlanCard({ plan }: { plan: Plan }) {
+  const tone = plan.featured
+    ? { card: "bg-blue-700 rounded-xl p-8 text-white", note: "text-blue-200 mb-6", list: "space-y-2 text-sm", cta: "bg-white text-blue-700 hover:bg-blue-50" }
+    : { card: "bg-white rounded-xl border p-8", note: "text-gray-500 mb-6", list: "space-y-2 text-gray-700 text-sm", cta: "bg-gray-900 text-white hover:bg-gray-800" };
+  return (
+    <div className={tone.card}>
+      <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
+      <p className="text-4xl font-extrabold mb-1">{plan.price}</p>
+      <p className={tone.note}>{plan.note}</p>
+      <ul className={tone.list}>
+        {plan.features.map((f) => <li key={f}>✓ {f}</li>)}
+      </ul>
+      <Link href="/register?role=customer" className={`mt-8 block text-center px-6 py-2.5 rounded-lg text-sm font-medium ${tone.cta}`}>
+        {plan.cta}
+      </Link>
+    </div>
+  );
+}
 
 export default function LandingPage() {
+  const content = homeContent(journeys);
+  const hasBlog = visibleBlogPosts(blogPosts, journeys).length > 0;
   return (
     <main className="flex flex-col min-h-screen">
       {/* Nav */}
       <nav className="border-b bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-10">
         <span className="text-xl font-bold text-blue-700">SkyVault</span>
         <div className="flex gap-4 items-center">
-          <Link href="/blog" className="text-sm text-gray-600 hover:text-gray-900">
-            Blog
-          </Link>
+          {hasBlog && (
+            <Link href="/blog" className="text-sm text-gray-600 hover:text-gray-900">
+              Blog
+            </Link>
+          )}
           <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">
             Sign in
           </Link>
@@ -21,14 +51,13 @@ export default function LandingPage() {
 
       {/* Hero — homeowners */}
       <section className="flex-1 flex flex-col items-center justify-center text-center px-6 py-24 bg-gradient-to-b from-blue-50 to-white">
-        <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-4">For homeowners</p>
+        <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-4">{content.hero.eyebrow}</p>
         <h1 className="text-5xl font-extrabold tracking-tight text-gray-900 max-w-3xl">
           Know the truth about{" "}
           <span className="text-blue-700">your roof</span>
         </h1>
         <p className="mt-6 text-xl text-gray-600 max-w-2xl">
-          Upload a few photos or book a drone capture. Our AI analyses them, produces a professional
-          health report, and connects you with verified local roofers — in minutes.
+          {content.hero.body}
         </p>
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <Link
@@ -48,11 +77,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Three steps to a roof report</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-            {[
-              { step: "1", title: "Upload or book", desc: "Take photos yourself or book a licensed drone operator for professional aerial imagery." },
-              { step: "2", title: "AI analysis", desc: "Our AI detects defects, scores your roof's condition, and generates a full PDF report within minutes." },
-              { step: "3", title: "Get quotes", desc: "Your report is shared with up to 3 verified local roofers who can contact you directly." },
-            ].map(({ step, title, desc }) => (
+            {content.steps.map(({ step, title, desc }) => (
               <div key={step} className="flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-blue-700 text-white flex items-center justify-center text-xl font-bold mb-4">
                   {step}
@@ -69,41 +94,15 @@ export default function LandingPage() {
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-4">Simple pricing for homeowners</h2>
-          <p className="text-center text-gray-500 mb-12">Free self-upload surveys. Paid drone capture for professional imagery.</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white rounded-xl border p-8">
-              <h3 className="text-xl font-bold mb-2">Self Upload</h3>
-              <p className="text-4xl font-extrabold mb-1">Free</p>
-              <p className="text-gray-500 mb-6">No credit card needed</p>
-              <ul className="space-y-2 text-gray-700 text-sm">
-                <li>✓ Upload your own photos</li>
-                <li>✓ AI roof health report</li>
-                <li>✓ PDF download</li>
-                <li>✓ Connect with up to 3 roofers</li>
-              </ul>
-              <Link href="/register?role=customer" className="mt-8 block text-center bg-gray-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800">
-                Get started free
-              </Link>
-            </div>
-            <div className="bg-blue-700 rounded-xl p-8 text-white">
-              <h3 className="text-xl font-bold mb-2">Drone Capture</h3>
-              <p className="text-4xl font-extrabold mb-1">£89</p>
-              <p className="text-blue-200 mb-6">One-time per property</p>
-              <ul className="space-y-2 text-sm">
-                <li>✓ Licensed drone pilot dispatched</li>
-                <li>✓ Professional aerial imagery</li>
-                <li>✓ Full AI analysis report</li>
-                <li>✓ Results within 48 hours</li>
-              </ul>
-              <Link href="/register?role=customer" className="mt-8 block text-center bg-white text-blue-700 px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-50">
-                Book a drone survey
-              </Link>
-            </div>
+          <p className="text-center text-gray-500 mb-12">{content.pricing.intro}</p>
+          <div className={`grid grid-cols-1 gap-8 ${content.pricing.plans.length > 1 ? "md:grid-cols-2" : "max-w-md mx-auto"}`}>
+            {content.pricing.plans.map((plan) => <PlanCard key={plan.name} plan={plan} />)}
           </div>
         </div>
       </section>
 
-      {/* Roofers section */}
+      {/* Roofers section — only while the roofer journey is on */}
+      {content.showRooferSection && (
       <section id="roofers" className="py-20 px-6 bg-white">
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
@@ -149,7 +148,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Drone operators section */}
+      )}
+
+      {/* Drone operators section — only while the drone journey is on */}
+      {content.showDroneOperatorSection && (
       <section id="operators" className="py-20 px-6 bg-blue-700 text-white">
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <div>
@@ -195,12 +197,14 @@ export default function LandingPage() {
         </div>
       </section>
 
+      )}
+
       {/* Footer */}
       <footer className="border-t bg-white px-6 py-8 text-center text-sm text-gray-500">
         <div className="flex justify-center gap-6 mb-4 text-xs">
-          <a href="#roofers" className="hover:text-gray-900">For roofers</a>
-          <a href="#operators" className="hover:text-gray-900">For drone operators</a>
-          <Link href="/login" className="hover:text-gray-900">Sign in</Link>
+          {content.footerLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="hover:text-gray-900">{link.label}</Link>
+          ))}
         </div>
         <p>© 2026 SkyVault Ltd. All rights reserved.</p>
         <p className="mt-1">AI reports are indicative assessments only and do not replace a physical inspection by a qualified professional.</p>
