@@ -1,0 +1,80 @@
+# admin-baseline: passive baseline as the seeded admin session.
+# Target is the app container on the internal network only. Caps are in minutes.
+env:
+  contexts:
+    - name: skyvault
+      urls:
+        - http://sv-zap-app:3000
+      includePaths:
+        - http://sv-zap-app:3000.*
+  parameters:
+    failOnError: false
+    failOnWarning: false
+    progressToStdout: true
+jobs:
+  - type: replacer
+    parameters:
+      deleteAllRules: true
+    rules:
+      - description: session cookie
+        matchType: req_header
+        matchString: Cookie
+        replacementString: "${SV_SESSION_COOKIE}"
+  - type: requestor
+    requests:
+      - url: http://sv-zap-app:3000/api/auth/session
+        method: GET
+      - url: http://sv-zap-app:3000/api/auth/register
+        method: GET
+      - url: http://sv-zap-app:3000/api/properties
+        method: GET
+      - url: http://sv-zap-app:3000/api/properties/svzap-property-a
+        method: GET
+      - url: http://sv-zap-app:3000/api/surveys
+        method: GET
+      - url: http://sv-zap-app:3000/api/surveys/svzap-survey-s1
+        method: GET
+      - url: http://sv-zap-app:3000/api/surveys/svzap-survey-s1/images
+        method: GET
+      - url: http://sv-zap-app:3000/api/surveys/svzap-survey-s1/images/presign
+        method: GET
+      - url: http://sv-zap-app:3000/api/surveys/svzap-survey-s1/analyse
+        method: GET
+      - url: http://sv-zap-app:3000/api/surveys/svzap-survey-s1/roofer-request
+        method: GET
+      - url: http://sv-zap-app:3000/api/photos/svzap-image-s1/tag
+        method: GET
+      - url: http://sv-zap-app:3000/api/stripe/webhook
+        method: GET
+      - url: http://sv-zap-app:3000/api/admin/impersonate
+        method: GET
+      - url: http://sv-zap-app:3000/api/admin/reports/svzap-report-s2
+        method: GET
+      - url: http://sv-zap-app:3000/api/admin/reports/svzap-report-s2/approve
+        method: GET
+      - url: http://sv-zap-app:3000/api/admin/reports/svzap-report-s2/resend-email
+        method: GET
+      - url: http://sv-zap-app:3000/api/admin/roofer-requests/svzap-lead-s2
+        method: GET
+      - url: http://sv-zap-app:3000/api/admin/users/svzap-user-customer-b
+        method: GET
+  - type: spider
+    parameters:
+      context: skyvault
+      url: http://sv-zap-app:3000
+      maxDuration: 3
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: export
+    parameters:
+      context: skyvault
+      type: har
+      source: all
+      fileName: /zap/wrk/out/history-admin-baseline.har
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/out
+      reportFile: report-admin-baseline.json
+      reportTitle: admin-baseline
