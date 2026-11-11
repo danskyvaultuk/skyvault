@@ -3,12 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { getPresignedReadUrl } from "@/lib/r2";
 import { roofContextSummaryLines, type RoofContext } from "@/lib/roofContext";
 import { isReportReleased } from "@/lib/reportRelease";
+import { customerDefects } from "@/lib/defectDisplay";
+import type { StoredDefect } from "@/lib/claude";
 import { RooferRequestSection } from "./roofer-request";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 
-// Severity badge colours
-const SEVERITY_STYLES: Record<string, string> = {
+// Priority badge colours (BL-009); "critical" only appears on reports from before priorities existed.
+const PRIORITY_STYLES: Record<string, string> = {
+  urgent:   "bg-red-100 text-red-700",
   critical: "bg-red-100 text-red-700",
   high:     "bg-orange-100 text-orange-700",
   medium:   "bg-blue-100 text-blue-700",
@@ -82,9 +85,11 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   if (!released && !isAdmin) return <BeingCheckedNotice surveyId={surveyId} />;
 
   // Parse JSON fields from the database
-  const defects = (report.defectsJson as Array<{
-    type: string; severity: string; description: string; image_index: number;
-  }>);
+  // Priority-labelled, most urgent first, located by photo (BL-009 / ADR-008).
+  const defects = customerDefects(
+    (report.defectsJson as StoredDefect[] | null) ?? [],
+    survey.images.map((img) => img.roofParts)
+  );
   const recommendations = report.recommendations as string[];
   const roofContextLines = roofContextSummaryLines(survey.roofContext as RoofContext | null);
 
@@ -223,19 +228,14 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <div className="divide-y">
             {defects.map((d, i) => (
               <div key={i} className="px-5 py-4 flex items-start gap-4">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-0.5 ${SEVERITY_STYLES[d.severity] ?? SEVERITY_STYLES.low}`}>
-                  {d.severity}
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-0.5 ${PRIORITY_STYLES[d.key] ?? PRIORITY_STYLES.low}`}>
+                  {d.label}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900 capitalize">
-                      {d.type.replace(/_/g, " ")}
-                    </p>
-                    {imageUrls[d.image_index] && (
-                      <span className="text-xs text-gray-400">photo {d.image_index + 1}</span>
-                    )}
-                  </div>
+                  <p className="text-sm font-medium text-gray-900">{d.typeText}</p>
                   <p className="text-sm text-gray-500 mt-0.5">{d.description}</p>
+                  <p className="text-xs text-gray-500 mt-1">{d.locationText}</p>
+                  {d.categoryText && <p className="text-xs text-gray-400 mt-0.5">{d.categoryText}</p>}
                 </div>
               </div>
             ))}

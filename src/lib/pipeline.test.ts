@@ -245,3 +245,22 @@ describe("runAnalysisPipeline — every report is held for admin review (BL-061)
     expect(mockNotifyCustomer).not.toHaveBeenCalled();
   });
 });
+
+describe("runAnalysisPipeline — priorities, locations and score caps (BL-003 / BL-009)", () => {
+  it("passes each photo's roof parts to the PDF so locations name the customer's labels", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{ roofParts: ["front"] }, {}]));
+    await runAnalysisPipeline("survey-1");
+    expect(mockRenderReportPDF.mock.calls[0][6]).toEqual([["front"], []]);
+  });
+
+  it("stores a capped score as both the report's score and the stored AI answer's score, keeping the AI's own", async () => {
+    mockAnalyzeRoof.mockResolvedValue({ ...VALID_ANALYSIS, condition_score: 3, ai_condition_score: 8 });
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+
+    await runAnalysisPipeline("survey-1");
+
+    const data = mockReportCreate.mock.calls[0][0].data;
+    expect(data.conditionScore).toBe(3);
+    expect(data.rawAiResponse).toMatchObject({ condition_score: 3, ai_condition_score: 8 });
+  });
+});
