@@ -221,8 +221,19 @@ scan() {
   rc=0
   if [ "$mode" = "${mode#unauth}" ]; then
     cookie="$(session_cookie "${mode%%-*}")"
+    # ZAP 2.17.0 does not expand ${SV_SESSION_COOKIE} in a replacer rule, so the plan is rendered with the real
+    # cookie inside the ZAP container (value from the environment, never argv; nothing lands on the host's disk).
+    docker cp security/zap/render-plan.sh "$SV_ZAP_ZAP:/zap/wrk/render-plan.sh"
+    docker exec "$SV_ZAP_ZAP" mkdir -p /zap/wrk/rendered
     SV_SESSION_COOKIE="$cookie" docker exec -e SV_SESSION_COOKIE "$SV_ZAP_ZAP" \
-      zap.sh -cmd -silent -newsession "/zap/wrk/session-$mode" -autorun "/zap/wrk/plans/$mode.yaml" \
+      sh /zap/wrk/render-plan.sh "/zap/wrk/plans/$mode.yaml" "/zap/wrk/rendered/$mode.yaml" \
+      || { echo "run.sh: could not render the $mode plan with the session cookie" >&2; exit 1; }
+    if docker exec "$SV_ZAP_ZAP" grep -qF '${SV_SESSION_COOKIE}' "/zap/wrk/rendered/$mode.yaml"; then
+      echo "run.sh: the rendered $mode plan still holds the literal cookie token" >&2
+      exit 1
+    fi
+    docker exec "$SV_ZAP_ZAP" \
+      zap.sh -cmd -silent -newsession "/zap/wrk/session-$mode" -autorun "/zap/wrk/rendered/$mode.yaml" \
       >"$SV_ZAP_OUT/zap-$mode.log" 2>&1 &
   else
     docker exec "$SV_ZAP_ZAP" \
