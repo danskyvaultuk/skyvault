@@ -294,3 +294,60 @@ describe("ReportReview.approve — a report whose score was capped (SPEC-010 C2)
     expect(deps.updateReport).toHaveBeenCalledWith("report-1", { status: "published" });
   });
 });
+
+describe("ReportReview.correct — peripheral zone and review flags (BL-004 / BL-010)", () => {
+  const ZONED = {
+    type: "gutter_damage",
+    severity: "high",
+    description: "Blocked gutter outlet",
+    image_index: 0,
+    priority: "high",
+    category: "functional",
+    extent: "small",
+    location: "right-hand outlet",
+    zone: "drainage_point",
+  };
+  const SHADOW = { reason: "low_light", description: "Rear slope in deep shadow", image_index: 0 };
+
+  it("accepts a correction setting a zone, and the re-made PDF carries it and the AI's review flags", async () => {
+    useReport(makeReport("draft", { rawAiResponse: { ...AI_RAW, review_flags: [SHADOW] } }));
+
+    const result = await review.correct("report-1", { ...CORRECTION, defects: [ZONED] });
+
+    expect(result).toEqual({ ok: true, status: "draft" });
+    const [analysis] = deps.renderPdf.mock.calls[0];
+    expect(analysis.defects[0]).toMatchObject({ zone: "drainage_point" });
+    expect(analysis.review_flags).toEqual([SHADOW]);
+    expect(deps.updateReport.mock.calls[0][1].defectsJson[0]).toMatchObject({ zone: "drainage_point" });
+  });
+
+  it("re-makes the PDF of a report from before flags existed with no flags", async () => {
+    useReport(makeReport("draft"));
+    await review.correct("report-1", CORRECTION);
+    expect(deps.renderPdf.mock.calls[0][0].review_flags).toEqual([]);
+  });
+
+  it("refuses an unknown zone and changes nothing", async () => {
+    useReport(makeReport("draft"));
+    const result = await review.correct("report-1", { ...CORRECTION, defects: [{ ...ZONED, zone: "attic" }] });
+    expect(result).toMatchObject({ ok: false, reason: "invalid" });
+    expect(deps.updateReport).not.toHaveBeenCalled();
+  });
+});
+
+describe("correctionValues — defects with and without a zone", () => {
+  it("lists a stored defect without a zone, and keeps a stored zone", () => {
+    const values = correctionValues({
+      conditionScore: 5,
+      defectsJson: [
+        { type: "moss_growth", severity: "low", description: "Moss", image_index: 0, priority: "low", category: "cosmetic", extent: "small", location: "top" },
+        { type: "gutter_damage", severity: "high", description: "Outlet", image_index: 1, priority: "high", category: "functional", extent: "small", location: "right", zone: "drainage_point" },
+      ],
+      recommendations: [],
+      adminNotes: null,
+    });
+    expect(values.defects).toHaveLength(2);
+    expect(values.defects[0].zone).toBeUndefined();
+    expect(values.defects[1].zone).toBe("drainage_point");
+  });
+});

@@ -7,7 +7,9 @@ import { getPresignedReadUrl } from "@/lib/r2";
 import { isReportReleased } from "@/lib/reportRelease";
 import { correctionValues, type ReportCorrection } from "@/lib/reportCorrection";
 import { ReviewForm } from "./review-form";
-import { customerDefects } from "@/lib/defectDisplay";
+import { customerDefectSections } from "@/lib/defectDisplay";
+import { REVIEW_FLAG_LABELS, customerAssessmentGaps, storedReviewFlags, type ReviewFlag } from "@/lib/reviewFlags";
+import { AssessmentGapsCard, DefectCard } from "@/components/reports/report-sections";
 
 type AiAnswer = {
   condition_score?: number;
@@ -39,7 +41,7 @@ function AiOriginal({ ai }: { ai: AiAnswer }) {
           <ul className="list-disc pl-5">
             {(ai.defects ?? []).map((d, i) => (
               <li key={i}>
-                [{d.priority ?? "no priority"} · severity {d.severity} · {d.category ?? "—"} · {d.extent ?? "—"}]{" "}
+                [{d.priority ?? "no priority"} · severity {d.severity} · {d.category ?? "—"} · {d.extent ?? "—"} · zone {d.zone ?? "—"}]{" "}
                 {d.type.replace(/_/g, " ")} — {d.description} (photo {d.image_index + 1}
                 {d.location ? `: ${d.location}` : ""})
               </li>
@@ -58,22 +60,45 @@ function AiOriginal({ ai }: { ai: AiAnswer }) {
   );
 }
 
-const PRIORITY_STYLES: Record<string, string> = {
-  urgent: "bg-red-100 text-red-700",
-  critical: "bg-red-100 text-red-700",
-  high: "bg-orange-100 text-orange-700",
-  medium: "bg-blue-100 text-blue-700",
-  low: "bg-gray-100 text-gray-600",
-};
+// BL-010: everything the AI flagged for a human look, with its reason.
+function ReviewFlags({ flags }: { flags: ReviewFlag[] }) {
+  if (flags.length === 0) return null;
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-6">
+      <h2 className="font-semibold text-amber-900">Needs a closer look ({flags.length})</h2>
+      <ul className="mt-2 space-y-1 text-sm text-amber-900">
+        {flags.map((f, i) => (
+          <li key={i}>
+            <span className="font-medium">{REVIEW_FLAG_LABELS[f.reason]}:</span> {f.description}
+            {f.image_index !== null && <span className="text-amber-700"> (photo {f.image_index + 1})</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-amber-700 mt-2">The customer sees only areas not assessed and areas too dark to judge.</p>
+    </div>
+  );
+}
 
 type Preview = {
   values: ReportCorrection;
+  flags: ReviewFlag[];
   photoRoofParts: string[][];
   remainingLife: number | null;
   confidence: string;
   surveyorNotes?: string;
   pdfUrl: string | null;
 };
+
+function PreviewDefects({ preview }: { preview: Preview }) {
+  const sections = customerDefectSections(preview.values.defects, preview.photoRoofParts);
+  return (
+    <div>
+      <AssessmentGapsCard gaps={customerAssessmentGaps(preview.flags)} />
+      <DefectCard title="Peripheral concerns" defects={sections.peripheral} />
+      <DefectCard title="Defects found" defects={sections.other} />
+    </div>
+  );
+}
 
 // The report exactly as the customer will see it once released: the saved
 // (corrected) values, not the AI's original.
@@ -88,21 +113,7 @@ function CustomerPreview({ preview }: { preview: Preview }) {
         <p className="text-gray-600 capitalize">AI confidence: {preview.confidence}</p>
       </div>
       {preview.surveyorNotes && <p className="text-sm text-blue-800 bg-blue-50 rounded-lg px-3 py-2">{preview.surveyorNotes}</p>}
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">Defects found ({values.defects.length})</p>
-        <ul className="space-y-2">
-          {customerDefects(values.defects, preview.photoRoofParts).map((d, i) => (
-            <li key={i} className="flex items-start gap-3 text-sm">
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${PRIORITY_STYLES[d.key] ?? PRIORITY_STYLES.low}`}>{d.label}</span>
-              <span className="text-gray-800">
-                <span className="font-medium">{d.typeText}</span> — {d.description}
-                <span className="block text-xs text-gray-500">{d.locationText}</span>
-                {d.categoryText && <span className="block text-xs text-gray-400">{d.categoryText}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <PreviewDefects preview={preview} />
       <div>
         <p className="text-sm font-medium text-gray-700 mb-2">Recommendations</p>
         <ol className="list-decimal pl-5 text-sm text-gray-800 space-y-1">
@@ -145,6 +156,7 @@ export default async function ReviewReportPage({ params }: { params: Promise<{ i
   const status = STATUS_LABEL[report.status];
   const ai = (report.rawAiResponse ?? {}) as AiAnswer;
   const values = correctionValues(report);
+  const flags = storedReviewFlags(report.rawAiResponse);
 
   return (
     <div className="p-4 md:p-8 max-w-4xl">
@@ -182,9 +194,12 @@ export default async function ReviewReportPage({ params }: { params: Promise<{ i
         </div>
       )}
 
+      <ReviewFlags flags={flags} />
+
       <CustomerPreview
         preview={{
           values,
+          flags,
           photoRoofParts: survey.images.map((img) => img.roofParts),
           remainingLife: report.estimatedRemainingLife,
           confidence: report.confidence,

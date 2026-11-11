@@ -8,6 +8,7 @@ import { RoofContextSchema, type RoofContext } from "@/lib/roofContext";
 import { isReportReleased } from "@/lib/reportRelease";
 import { ReportCorrectionSchema, type ReportCorrection } from "@/lib/reportCorrection";
 import type { PreparedPhoto, SurveyPhoto } from "@/lib/surveyImages";
+import { storedReviewFlags } from "@/lib/reviewFlags";
 
 export type ReviewReport = {
   id: string;
@@ -174,6 +175,8 @@ export class ReportReview {
       confidence: confidenceOf(report.confidence),
       urgent_action_required: ai.urgent_action_required ?? false,
       surveyor_notes: ai.surveyor_notes ?? "",
+      // The AI's flags are kept as it raised them; the admin does not edit them (SPEC-013).
+      review_flags: storedReviewFlags(report.rawAiResponse),
     };
   }
 }

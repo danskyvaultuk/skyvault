@@ -73,6 +73,7 @@ const VALID_ANALYSIS = {
   urgent_action_required: false,
   confidence: "high",
   surveyor_notes: "Looks fine.",
+  review_flags: [],
 };
 
 function makeSurvey(

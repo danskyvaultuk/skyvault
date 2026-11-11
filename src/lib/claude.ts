@@ -3,6 +3,8 @@ import { z } from "zod";
 import { buildRoofContextPromptBlock, type RoofContext } from "@/lib/roofContext";
 import { buildPhotoLabelsBlock, type RoofPart } from "@/lib/photoTag";
 import { applyScoreCaps, rubricPromptSection } from "@/lib/scoringRubric";
+import { ReviewFlagSchema, reviewFlagPromptSection, withLowConfidenceFlag, type ReviewFlag } from "@/lib/reviewFlags";
+import { DEFECT_ZONES, peripheralPromptSection } from "@/lib/peripheralZones";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -22,6 +24,8 @@ const DefectSchema = z.object({
   category: z.enum(["cosmetic", "functional"]),
   extent: z.enum(["small", "moderate", "large"]),
   location: z.string().max(120),
+  // BL-004: the peripheral zone the defect is in, or "none".
+  zone: z.enum(DEFECT_ZONES),
 });
 
 export const RoofAnalysisSchema = z.object({
@@ -32,6 +36,8 @@ export const RoofAnalysisSchema = z.object({
   urgent_action_required: z.boolean(),
   confidence: z.enum(["low", "medium", "high"]),
   surveyor_notes: z.string(),
+  // BL-010: what needs a human look (may be empty).
+  review_flags: z.array(ReviewFlagSchema),
 });
 
 export type RoofAnalysis = z.infer<typeof RoofAnalysisSchema>;
@@ -42,11 +48,15 @@ export type Defect = z.infer<typeof DefectSchema>;
  * A defect as stored on a report. Reports made before BL-009 have no
  * priority, category, extent or location, so those are optional here.
  */
-export type StoredDefect = Omit<Defect, "priority" | "category" | "extent" | "location"> &
-  Partial<Pick<Defect, "priority" | "category" | "extent" | "location">>;
+export type StoredDefect = Omit<Defect, "priority" | "category" | "extent" | "location" | "zone"> &
+  Partial<Pick<Defect, "priority" | "category" | "extent" | "location" | "zone">>;
 
 /** An analysis as rendered into a report or PDF: its defects may be stored ones. */
-export type ReportAnalysis = Omit<RoofAnalysis, "defects"> & { defects: StoredDefect[] };
+export type ReportAnalysis = Omit<RoofAnalysis, "defects" | "review_flags"> & {
+  defects: StoredDefect[];
+  /** Absent on reports made before BL-010. */
+  review_flags?: ReviewFlag[];
+};
 
 /** A validated analysis after the safety caps; `ai_condition_score` is the AI's own score when a cap lowered it. */
 export type CappedRoofAnalysis = RoofAnalysis & { ai_condition_score?: number };
@@ -92,16 +102,26 @@ Return ONLY valid JSON matching this exact schema — no markdown, no prose, no 
     "priority": "<low|medium|high|urgent — how soon to act, per the rubric below>",
     "category": "<cosmetic|functional — per the rubric below>",
     "extent": "<small|moderate|large — how much of the visible roof it affects>",
-    "location": "<max 120 chars: where in that image the defect is, e.g. lower left, near the gutter>"
+    "location": "<max 120 chars: where in that image the defect is, e.g. lower left, near the gutter>",
+    "zone": "<eaves|wall_junction|fascia|upstand|drainage_point|protrusion|none — per the peripheral zones below>"
   }],
   "estimated_remaining_life_years": <integer or null if unable to estimate>,
   "recommendations": ["<specific action item>"],
   "urgent_action_required": <true if score <= 3 or any critical defect>,
   "confidence": "<low|medium|high — based on image quality and coverage>",
-  "surveyor_notes": "<overall summary, max 1000 chars>"
+  "surveyor_notes": "<overall summary, max 1000 chars>",
+  "review_flags": [{
+    "reason": "<low_confidence|ambiguous|unassessable_area|low_light — per the review flags below>",
+    "description": "<max 150 chars: what and where, from the photo>",
+    "image_index": <0-based index of the photo it concerns, or null>
+  }]
 }
 
 ${rubricPromptSection()}
+
+${peripheralPromptSection()}
+
+${reviewFlagPromptSection()}
 
 Location: say where in the image the defect is (for example "lower left, near the gutter", "right of the
 chimney"). Never state a slope as measured or name a compass direction you cannot see; if the image has a customer
@@ -147,7 +167,8 @@ export async function analyzeRoof(
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: 2048,
+    // Room for the flags and zones (SPEC-013); the model itself is BL-067's.
+    max_tokens: 4096,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -187,5 +208,6 @@ export async function analyzeRoof(
   }
 
   // Safety caps (SPEC-010): a serious functional defect limits the score; the AI's own score is kept.
-  return applyScoreCaps(result.data);
+  // Low confidence always shows as a review flag (SPEC-013 A3).
+  return withLowConfidenceFlag(applyScoreCaps(result.data));
 }

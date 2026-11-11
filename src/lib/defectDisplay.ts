@@ -2,9 +2,11 @@
 // the PDF. Priority is the label; severity stays behind the scenes. Location is
 // phrased from the photo, crediting the customer's own label, and never as a
 // measured slope (ADR-008). Defects from before BL-009 still display.
+// Defects in a peripheral zone (BL-004) are listed in their own section.
 import type { StoredDefect } from "@/lib/claude";
 import { CHECKLIST } from "@/lib/photoChecklist";
 import { ROOF_PART_LABELS, type RoofPart } from "@/lib/photoTag";
+import { ZONE_LABELS } from "@/lib/peripheralZones";
 
 export type CustomerDefect = {
   key: "urgent" | "high" | "medium" | "low" | "critical";
@@ -13,6 +15,8 @@ export type CustomerDefect = {
   description: string;
   categoryText: string | null;
   locationText: string;
+  /** The peripheral zone's name, or null when the defect is in none. */
+  zoneText: string | null;
 };
 
 const ORDER: Record<CustomerDefect["key"], number> = { urgent: 0, critical: 0, high: 1, medium: 2, low: 3 };
@@ -55,7 +59,19 @@ export function customerDefects(
         description: d.description,
         categoryText: d.category ? CATEGORY_TEXT[d.category] : null,
         locationText: locationText(d, photoRoofParts),
+        zoneText: d.zone && d.zone !== "none" ? ZONE_LABELS[d.zone] : null,
       };
     })
     .sort((a, b) => ORDER[a.key] - ORDER[b.key]);
+}
+
+export type CustomerDefectSections = { peripheral: CustomerDefect[]; other: CustomerDefect[] };
+
+/** The defects split into "Peripheral concerns" and the main list, each most urgent first. */
+export function customerDefectSections(
+  defects: readonly StoredDefect[],
+  photoRoofParts: readonly (readonly string[])[]
+): CustomerDefectSections {
+  const all = customerDefects(defects, photoRoofParts);
+  return { peripheral: all.filter((d) => d.zoneText !== null), other: all.filter((d) => d.zoneText === null) };
 }

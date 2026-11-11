@@ -2,6 +2,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { REVIEW_FLAG_LABELS, storedReviewFlags } from "@/lib/reviewFlags";
+
+// BL-010: a held report the AI flagged says why it needs a closer look.
+function CloserLookBadge({ rawAiResponse }: { rawAiResponse: unknown }) {
+  const reasons = [...new Set(storedReviewFlags(rawAiResponse).map((f) => REVIEW_FLAG_LABELS[f.reason]))];
+  if (reasons.length === 0) return null;
+  return (
+    <p className="mt-2 text-xs">
+      <span className="font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Needs a closer look</span>
+      <span className="text-amber-800"> {reasons.join(" · ")}</span>
+    </p>
+  );
+}
 
 // Reports held for review (BL-061): every new report waits here until an
 // admin approves it. Oldest first, so nobody waits longest.
@@ -47,6 +60,7 @@ export default async function ReportsToReviewPage() {
                 <p className="text-sm text-gray-600 mt-1">
                   {r.survey.customer.name ?? "—"} · {r.survey.customer.email}
                 </p>
+                <CloserLookBadge rawAiResponse={r.rawAiResponse} />
               </div>
               <div className="text-right shrink-0">
                 <p className="text-sm text-gray-500">
