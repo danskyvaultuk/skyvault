@@ -55,7 +55,15 @@ export type ReportReviewDeps = {
   ): Promise<Buffer>;
   storePdf(key: string, pdf: Buffer): Promise<void>;
   pdfKeyFor(surveyId: string): string;
-  notifyCustomer(args: { customerEmail: string; customerName: string; surveyId: string }): Promise<void>;
+  notifyCustomer(args: {
+    customerEmail: string;
+    customerName: string;
+    surveyId: string;
+    postcode: string;
+    pdf: Buffer | null;
+  }): Promise<void>;
+  /** Reads a stored PDF, to attach it to the report ready email (BL-022). */
+  readPdf(key: string): Promise<Buffer>;
 };
 
 export type ReviewResult =
@@ -139,12 +147,28 @@ export class ReportReview {
     return { ok: true, status: report.status };
   }
 
-  private emailCustomer(report: ReviewReport): Promise<void> {
-    return this.deps.notifyCustomer({
+  private async emailCustomer(report: ReviewReport): Promise<void> {
+    await this.deps.notifyCustomer({
       customerEmail: report.survey.customer.email,
       customerName: report.survey.customer.name ?? "",
       surveyId: report.surveyId,
+      postcode: report.survey.property.postcode,
+      pdf: await this.storedPdf(report),
     });
+  }
+
+  /** The stored PDF to attach (BL-022), or null: the email never waits on it. */
+  private async storedPdf(report: ReviewReport): Promise<Buffer | null> {
+    if (!report.pdfS3Key) {
+      console.warn(`[review] Report ${report.id} has no stored PDF; emailing the link alone`);
+      return null;
+    }
+    try {
+      return await this.deps.readPdf(report.pdfS3Key);
+    } catch (err) {
+      console.error(`[review] Could not read the PDF for report ${report.id}; emailing the link alone`, err);
+      return null;
+    }
   }
 
   private async remakePdf(report: ReviewReport, correction: ReportCorrection): Promise<string> {

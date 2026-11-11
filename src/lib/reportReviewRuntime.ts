@@ -1,6 +1,6 @@
 // Wires ReportReview to the real database, storage, PDF renderer and email.
 import { prisma } from "@/lib/prisma";
-import { generatePdfKey, uploadBuffer } from "@/lib/r2";
+import { downloadBuffer, generatePdfKey, uploadBuffer } from "@/lib/r2";
 import { renderReportPDF } from "@/lib/pdf";
 import { notifyCustomerReportReady } from "@/lib/resend";
 import { fetchSurveyPhotos } from "@/lib/surveyImages";
@@ -32,6 +32,7 @@ export function buildReportReview(): ReportReview {
     storePdf: (key, pdf) => uploadBuffer(key, pdf, "application/pdf"),
     pdfKeyFor: generatePdfKey,
     notifyCustomer: notifyCustomerReportReady,
+    readPdf: downloadBuffer,
   });
 }
 
