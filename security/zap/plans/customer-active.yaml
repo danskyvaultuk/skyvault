@@ -58,6 +58,46 @@ jobs:
         method: GET
       - url: http://sv-zap-app:3000/api/admin/users/svzap-user-customer-b
         method: GET
+      - url: http://sv-zap-app:3000/dashboard
+        method: GET
+      - url: http://sv-zap-app:3000/properties
+        method: GET
+      - url: http://sv-zap-app:3000/properties/new
+        method: GET
+      - url: http://sv-zap-app:3000/properties/svzap-property-a
+        method: GET
+      - url: http://sv-zap-app:3000/surveys
+        method: GET
+      - url: http://sv-zap-app:3000/surveys/new
+        method: GET
+      - url: http://sv-zap-app:3000/surveys/svzap-survey-s1
+        method: GET
+      - url: http://sv-zap-app:3000/surveys/svzap-survey-s2/report
+        method: GET
+      - url: http://sv-zap-app:3000/surveys/svzap-survey-s3/report
+        method: GET
+      - url: http://sv-zap-app:3000/quotes
+        method: GET
+      - url: http://sv-zap-app:3000/unavailable
+        method: GET
+      - url: http://sv-zap-app:3000/auth/redirect
+        method: GET
+      - url: http://sv-zap-app:3000/admin/dashboard
+        method: GET
+      - url: http://sv-zap-app:3000/admin/reports
+        method: GET
+      - url: http://sv-zap-app:3000/admin/reports/svzap-report-s2
+        method: GET
+      - url: http://sv-zap-app:3000/admin/reports/svzap-report-s3
+        method: GET
+      - url: http://sv-zap-app:3000/admin/roofer-requests
+        method: GET
+      - url: http://sv-zap-app:3000/admin/roofers
+        method: GET
+      - url: http://sv-zap-app:3000/admin/surveys
+        method: GET
+      - url: http://sv-zap-app:3000/admin/users
+        method: GET
   - type: spider
     parameters:
       context: skyvault

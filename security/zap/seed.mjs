@@ -44,6 +44,31 @@ export const SEED = {
       report: { id: 'svzap-report-s2', conditionScore: 50 },
       lead: { id: 'svzap-lead-s2', postcode: 'ZZ99 1AA' },
     },
+    s3: {
+      id: 'svzap-survey-s3',
+      type: 'self_upload',
+      status: 'complete',
+      report: {
+        id: 'svzap-report-s3',
+        status: 'published',
+        conditionScore: 6,
+        confidence: 'medium',
+        recommendations: ['Placeholder recommendation for the scan harness.'],
+        defects: [
+          {
+            type: 'cracked_tiles',
+            severity: 'medium',
+            description: 'Placeholder defect description for the scan harness.',
+            image_index: 0,
+            priority: 'medium',
+            category: 'functional',
+            extent: 'small',
+            location: 'Placeholder location',
+            zone: 'none',
+          },
+        ],
+      },
+    },
   },
   unseededDroneJobId: 'svzap-dronejob-unseeded',
 };
@@ -112,6 +137,25 @@ async function main() {
         surveyId: surveys.s2.id,
         reportId: surveys.s2.report.id,
         postcode: surveys.s2.lead.postcode,
+      },
+    });
+    await prisma.survey.create({
+      data: {
+        id: surveys.s3.id,
+        propertyId: property.id,
+        customerId: users.customerA.id,
+        type: surveys.s3.type,
+        status: surveys.s3.status,
+        report: {
+          create: {
+            id: surveys.s3.report.id,
+            status: surveys.s3.report.status,
+            conditionScore: surveys.s3.report.conditionScore,
+            defectsJson: surveys.s3.report.defects,
+            recommendations: surveys.s3.report.recommendations,
+            confidence: surveys.s3.report.confidence,
+          },
+        },
       },
     });
   } finally {
