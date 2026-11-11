@@ -8,8 +8,9 @@ or changed by it, and it adds no `package.json` script.
 
 `run.sh` runs one sequence:
 
-1. Pulls three images by tag (the Node image, the ZAP image and Postgres) and builds the application image from
+1. Pulls three images by digest (the Node image, the ZAP image and Postgres) and builds the application image from
    the checked-out source with a dedicated, named builder.
+   buildx pulls its own moby/buildkit image by tag; the harness does not pin it.
 2. Creates an internal Docker network (no published port, no egress), starts a throwaway Postgres on it, applies
    the migrations, and starts the application.
 3. Seeds placeholder data (fixed ids, example addresses, no real data) with `seed.mjs`. The seed deletes and
@@ -26,6 +27,7 @@ or changed by it, and it adds no `package.json` script.
    answers for that identity and, without the cookie, does not. Between the unauthenticated and authenticated
    modes it also issues a fixed set of cross-account requests with `a01-requests.mjs` and records the status
    codes.
+   After each authenticated baseline, `page-proof.mjs` checks against `expected-pages.json` that every page in that identity's list was served to the signed-in session, and a failure stops the run before that identity's active mode (`pageProof` in the mode record, per-path lines in `page-proof-<mode>.txt`).
 6. Writes `venue.json` (ZAP version, image digests, and per mode its start, duration, ZAP exit code, a memory
    sample and whether a cap was reached) and copies the raw reports out of the ZAP container.
 7. Removes, by name, the containers, the Postgres volume, the network and the builder it created, whatever the
@@ -62,7 +64,7 @@ termination signal and its cleanup runs. `SV_ZAP_OUT` overrides the output direc
 ## Raw output
 
 Raw output lands in `security/zap/out/`, which is git-ignored: the per-mode ZAP reports (`report-<mode>.json`), the
-Automation Framework logs, the HAR of the unauthenticated baseline (`history-unauth-baseline.har`), the session
+Automation Framework logs, the HARs of the baselines (`history-<mode>.har`, the authenticated ones with their `page-proof-<mode>.txt`), the session
 control and cross-account request records, and `venue.json`.
 
 Raw output can hold request and response text, so it must be redacted before it is shared or committed:
@@ -84,4 +86,4 @@ Two helpers shrink the raw output for the record:
 
 `selftest-redact.mjs`, `selftest-mint.mjs` and `selftest-slim.mjs` build their fixtures at run time in a scratch
 directory inside the git directory and remove it afterwards. They are named `selftest-*` so the project's test
-runner does not collect them. `selftest-cap.mjs` and `selftest-auth-proof.mjs` assemble their synthetic logs and HARs in memory: the first feeds `cap-reached.awk`, which run.sh uses to read whether a job reached its cap; the second feeds `har-auth-proof.mjs`, the positive control that the customer and admin baselines' own ZAP traffic carried the session cookie (recorded as `authProof` in the mode record; a failure stops the run before that identity's active mode).
+runner does not collect them. `selftest-cap.mjs` and `selftest-auth-proof.mjs` assemble their synthetic logs and HARs in memory: the first feeds `cap-reached.awk`, which run.sh uses to read whether a job reached its cap; the second feeds `har-auth-proof.mjs`, the positive control that the customer and admin baselines' own ZAP traffic carried the session cookie (recorded as `authProof` in the mode record; a failure stops the run before that identity's active mode). `selftest-page-proof.mjs` assembles its HARs and lists in a scratch directory inside the git directory: it feeds `page-proof.mjs` both passing and failing cases (the page proof that every page in an identity's list was served to the signed-in session, recorded as `pageProof` in the mode record).

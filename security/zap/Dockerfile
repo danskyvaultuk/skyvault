@@ -2,7 +2,7 @@
 # node_modules or .env file enters the context:
 #   docker build -f security/zap/Dockerfile .
 # No variable from the production configuration is set here: the run script supplies the run-time environment.
-FROM node:22-bookworm
+FROM node:22-bookworm@sha256:7702d8aa4d5910871692af4480eb3ba86f23047a6417a44d857d06c95d060d3f
 
 WORKDIR /app
 COPY . .

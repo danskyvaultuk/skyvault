@@ -15,7 +15,12 @@ SV_ZAP_IMAGE=sv-zap-app:local
 SV_ZAP_BUILDER=sv-zap-builder
 SV_ZAP_OUT="${SV_ZAP_OUT:-security/zap/out}"
 SV_ZAP_BUILDKIT_IMAGE=moby/buildkit:buildx-stable-1
-SV_ZAP_IMAGES="node:22-bookworm zaproxy/zap-stable postgres:16"
+# Every image the run pulls or runs is pinned by digest (the same digests as the Dockerfile's FROM). buildx pulls
+# its own moby/buildkit image by tag; the harness does not pin it.
+SV_ZAP_NODE_REF=node:22-bookworm@sha256:7702d8aa4d5910871692af4480eb3ba86f23047a6417a44d857d06c95d060d3f
+SV_ZAP_ZAP_REF=zaproxy/zap-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+SV_ZAP_PG_REF=postgres:16@sha256:f9a7b9ebf6f56201f949db745e47bc423c0f0f8294bafe991cc10bf74b029657
+SV_ZAP_IMAGES="$SV_ZAP_NODE_REF $SV_ZAP_ZAP_REF $SV_ZAP_PG_REF"
 SV_ZAP_DEADLINE_MINS="${SV_ZAP_DEADLINE_MINS:-170}"
 SV_ZAP_MODES="unauth-baseline unauth-active customer-baseline customer-active admin-baseline admin-active"
 SV_ZAP_SPIDER_CAP_MINS=3
@@ -83,7 +88,7 @@ start_db() {
     -e POSTGRES_USER=svzap \
     -e POSTGRES_PASSWORD=svzap \
     -e POSTGRES_DB=svzap \
-    postgres:16
+    "$SV_ZAP_PG_REF"
   tries=0
   until docker exec "$SV_ZAP_DB" pg_isready -U svzap >/dev/null 2>&1; do
     tries=$((tries + 1))
@@ -206,7 +211,7 @@ start_deadline() {
 
 # ZAP runs as one long-lived container; each mode is a docker exec of the Automation Framework in it.
 start_zap() {
-  sv_run -d --name "$SV_ZAP_ZAP" --entrypoint sleep zaproxy/zap-stable $(( SV_ZAP_DEADLINE_MINS * 60 + 600 ))
+  sv_run -d --name "$SV_ZAP_ZAP" --entrypoint sleep "$SV_ZAP_ZAP_REF" $(( SV_ZAP_DEADLINE_MINS * 60 + 600 ))
   docker exec "$SV_ZAP_ZAP" mkdir -p /zap/wrk/out /zap/wrk/plans
   docker exec "$SV_ZAP_ZAP" zap.sh -cmd -silent -version 2>/dev/null | tail -n 1 >"$SV_ZAP_OUT/zap-version.txt"
 }
@@ -263,6 +268,23 @@ scan() {
         proof="$proof_line"
       fi ;;
   esac
+  # Page proof for the authenticated baselines: every page in the identity's list must have been served to the
+  # signed-in session. It is the condition of an if, so set -e cannot end the script before pageProof is recorded.
+  page_proof=n/a
+  case "$mode" in
+    customer-baseline|admin-baseline)
+      page_proof="failed: no HAR"
+      if [ -f "$SV_ZAP_OUT/history-$mode.har" ]; then
+        if sv_run --rm -i "$SV_ZAP_IMAGE" node security/zap/page-proof.mjs --list security/zap/expected-pages.json --identity "${mode%-baseline}" - <"$SV_ZAP_OUT/history-$mode.har" >"$SV_ZAP_OUT/page-proof-$mode.txt" 2>"$SV_ZAP_OUT/page-proof-$mode.err"; then
+          page_proof=pass
+        else
+          failed_path="$(sed -n '1s/^page-proof: failed \(\/[^ ]*\) (.*$/\1/p' "$SV_ZAP_OUT/page-proof-$mode.err")"
+          if grep -qF '(unreadable' "$SV_ZAP_OUT/page-proof-$mode.err"; then page_proof="failed: unreadable HAR"
+          elif [ -n "$failed_path" ]; then page_proof="failed: $failed_path"
+          else page_proof="failed: no verdict"; fi
+        fi
+      fi ;;
+  esac
   cap=no
   # Whether a job reached its cap is read from the job's own "time taken" line (security/zap/cap-reached.awk).
   if [ -f "$SV_ZAP_OUT/zap-$mode.log" ]; then
@@ -270,8 +292,8 @@ scan() {
       -v active=$(( SV_ZAP_ACTIVE_CAP_MINS * 60 )) -f security/zap/cap-reached.awk "$SV_ZAP_OUT/zap-$mode.log")"
   fi
   if [ "$mode" != "${mode%-active}" ] && [ "$seconds" -ge $(( SV_ZAP_ACTIVE_CAP_MINS * 60 )) ]; then cap=yes; fi
-  printf '{ "mode": "%s", "startedEpoch": %s, "durationSeconds": %s, "zapExit": %s, "reportProduced": "%s", "capReached": "%s", "authProof": "%s" }\n' \
-    "$mode" "$started" "$seconds" "$rc" "$produced" "$cap" "$proof" >"$SV_ZAP_OUT/mode-$mode.json"
+  printf '{ "mode": "%s", "startedEpoch": %s, "durationSeconds": %s, "zapExit": %s, "reportProduced": "%s", "capReached": "%s", "authProof": "%s", "pageProof": "%s" }\n' \
+    "$mode" "$started" "$seconds" "$rc" "$produced" "$cap" "$proof" "$page_proof" >"$SV_ZAP_OUT/mode-$mode.json"
   if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
     SV_ZAP_STOP_REASON="$mode: ZAP exited $rc"
     echo "run.sh: $SV_ZAP_STOP_REASON; the remaining steps are skipped" >&2
@@ -282,6 +304,12 @@ scan() {
     echo "run.sh: $SV_ZAP_STOP_REASON; the remaining steps are skipped" >&2
     return 1
   fi
+  case "$page_proof" in
+    failed*)
+      SV_ZAP_STOP_REASON="$mode: page proof $page_proof"
+      echo "run.sh: $SV_ZAP_STOP_REASON; the remaining steps are skipped" >&2
+      return 1 ;;
+  esac
   if [ "$produced" != yes ]; then
     SV_ZAP_STOP_REASON="$mode: no report produced"
     echo "run.sh: $SV_ZAP_STOP_REASON; the remaining steps are skipped" >&2
