@@ -2,6 +2,7 @@
 # ZAP scan harness: build the app image, run the app and a throwaway database on an internal Docker network
 # (no published port, no egress), and clean everything up by name on exit.
 #   sh security/zap/run.sh [--remove-images]
+# SV_ZAP_DEADLINE_MINS (default 170) bounds the whole run: at the deadline the script is sent TERM and cleans up.
 # Needs docker, openssl and the OS only. Run it from the repository root (a git archive of the commit).
 set -eu
 
@@ -15,6 +16,13 @@ SV_ZAP_BUILDER=sv-zap-builder
 SV_ZAP_OUT="${SV_ZAP_OUT:-security/zap/out}"
 SV_ZAP_BUILDKIT_IMAGE=moby/buildkit:buildx-stable-1
 SV_ZAP_IMAGES="node:22-bookworm zaproxy/zap-stable postgres:16"
+SV_ZAP_DEADLINE_MINS="${SV_ZAP_DEADLINE_MINS:-170}"
+SV_ZAP_MODES="unauth-baseline unauth-active customer-baseline customer-active admin-baseline admin-active"
+SV_ZAP_ACTIVE_CAP_MINS=20
+SV_ZAP_TIMER=""
+SV_ZAP_STOP_REASON="not reached"
+SV_ZAP_MISSING=0
+SV_COOKIE_NAME=""
 SV_ZAP_DB_URL="postgresql://svzap:svzap@${SV_ZAP_DB}:5432/svzap"
 
 REMOVE_IMAGES=0
@@ -31,6 +39,8 @@ sv_run() { docker run --network "$SV_ZAP_NET" "$@"; }
 cleanup() {
   status=$?
   trap - EXIT INT TERM
+  if [ -n "$SV_ZAP_TIMER" ]; then kill "$SV_ZAP_TIMER" >/dev/null 2>&1 || true; fi
+  if write_venue && [ "$status" -eq 0 ] && [ "$SV_ZAP_MISSING" -gt 0 ]; then status=1; fi
   for name in "$SV_ZAP_ZAP" "$SV_ZAP_APP" "$SV_ZAP_DB"; do
     docker rm -f -v "$name" >/dev/null 2>&1 || true
   done
@@ -190,3 +200,132 @@ start_db
 migrate
 start_app
 wait_for_app
+
+# A background timer sends TERM to this script at the overall deadline, so the trap still cleans up by name.
+# It is killed on a normal exit by cleanup.
+start_deadline() {
+  parent=$$
+  deadline=$(( $(date +%s) + SV_ZAP_DEADLINE_MINS * 60 ))
+  (
+    while [ "$(date +%s)" -lt "$deadline" ]; do sleep 5; done
+    echo "run.sh: overall deadline of $SV_ZAP_DEADLINE_MINS minutes reached" >&2
+    kill -TERM "$parent"
+  ) >/dev/null 2>&1 &
+  SV_ZAP_TIMER=$!
+}
+
+# ZAP runs as one long-lived container; each mode is a docker exec of the Automation Framework in it.
+start_zap() {
+  sv_run -d --name "$SV_ZAP_ZAP" --entrypoint sleep zaproxy/zap-stable $(( SV_ZAP_DEADLINE_MINS * 60 + 600 ))
+  docker exec "$SV_ZAP_ZAP" mkdir -p /zap/wrk/out /zap/wrk/plans
+  docker exec "$SV_ZAP_ZAP" zap.sh -cmd -silent -version 2>/dev/null | tail -n 1 >"$SV_ZAP_OUT/zap-version.txt"
+}
+
+# scan <mode>: copy the plan in, run it on a fresh session, record start, duration, exit code, a memory sample
+# and whether a cap was reached, then copy the report (and any HAR) out. A ZAP exit other than 0 or 2 (2 is the
+# Automation Framework's "warnings") or a missing report stops the run, so the trap cleans up.
+scan() {
+  mode="$1"
+  docker cp "security/zap/plans/$mode.yaml" "$SV_ZAP_ZAP:/zap/wrk/plans/$mode.yaml"
+  started=$(date +%s)
+  rc=0
+  if [ "$mode" = "${mode#unauth}" ]; then
+    cookie="$(session_cookie "${mode%%-*}")"
+    SV_SESSION_COOKIE="$cookie" docker exec -e SV_SESSION_COOKIE "$SV_ZAP_ZAP" \
+      zap.sh -cmd -silent -newsession "/zap/wrk/session-$mode" -autorun "/zap/wrk/plans/$mode.yaml" \
+      >"$SV_ZAP_OUT/zap-$mode.log" 2>&1 &
+  else
+    docker exec "$SV_ZAP_ZAP" \
+      zap.sh -cmd -silent -newsession "/zap/wrk/session-$mode" -autorun "/zap/wrk/plans/$mode.yaml" \
+      >"$SV_ZAP_OUT/zap-$mode.log" 2>&1 &
+  fi
+  zap_pid=$!
+  # One memory sample while the mode is running. Backgrounded and waited on, so a TERM is not held up by it.
+  sleep 45 &
+  nap=$!
+  wait "$nap" || true
+  if kill -0 "$zap_pid" 2>/dev/null; then
+    docker stats --no-stream --format '{{json .}}' "$SV_ZAP_ZAP" "$SV_ZAP_APP" "$SV_ZAP_DB" >"$SV_ZAP_OUT/stats-$mode.jsonl" 2>/dev/null || true
+  fi
+  wait "$zap_pid" || rc=$?
+  seconds=$(( $(date +%s) - started ))
+  produced=no
+  if docker cp "$SV_ZAP_ZAP:/zap/wrk/out/report-$mode.json" "$SV_ZAP_OUT/report-$mode.json" 2>/dev/null; then produced=yes; fi
+  docker cp "$SV_ZAP_ZAP:/zap/wrk/out/history-$mode.har" "$SV_ZAP_OUT/history-$mode.har" 2>/dev/null || true
+  cap=no
+  if grep -qiE 'max(imum)?[ _-]*duration|duration.*(reached|exceeded)' "$SV_ZAP_OUT/zap-$mode.log" 2>/dev/null; then cap=yes; fi
+  if [ "$mode" != "${mode%-active}" ] && [ "$seconds" -ge $(( SV_ZAP_ACTIVE_CAP_MINS * 60 )) ]; then cap=yes; fi
+  printf '{ "mode": "%s", "startedEpoch": %s, "durationSeconds": %s, "zapExit": %s, "reportProduced": "%s", "capReached": "%s" }\n' \
+    "$mode" "$started" "$seconds" "$rc" "$produced" "$cap" >"$SV_ZAP_OUT/mode-$mode.json"
+  if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
+    SV_ZAP_STOP_REASON="$mode: ZAP exited $rc"
+    echo "run.sh: $SV_ZAP_STOP_REASON; the remaining steps are skipped" >&2
+    return 1
+  fi
+  if [ "$produced" != yes ]; then
+    SV_ZAP_STOP_REASON="$mode: no report produced"
+    echo "run.sh: $SV_ZAP_STOP_REASON; the remaining steps are skipped" >&2
+    return 1
+  fi
+}
+
+# image_record <image>: the image id and its registry digest when it has one.
+image_record() {
+  id="$(docker image inspect --format '{{.Id}}' "$1" 2>/dev/null || echo unknown)"
+  digest="$(docker image inspect --format '{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' "$1" 2>/dev/null || true)"
+  printf '"%s": { "id": "%s", "repoDigest": "%s" }' "$1" "$id" "${digest:-none}"
+}
+
+# write_venue: venue.json records the ZAP version, the image digests and every mode's timing, exit code, memory
+# sample and cap. A mode with no report is recorded "not run" with the reason, never as a pass or a count. Sets
+# SV_ZAP_MISSING to the number of modes that did not run. Called by cleanup, so it also runs on a stop.
+write_venue() {
+  [ -d "$SV_ZAP_OUT" ] || return 1
+  SV_ZAP_MISSING=0
+  zap_version="$(cat "$SV_ZAP_OUT/zap-version.txt" 2>/dev/null || true)"
+  {
+    printf '{\n  "venue": "operator'"'"'s Mac",\n  "zapVersion": "%s",\n  "images": {\n' "${zap_version:-unknown}"
+    sep=""
+    for image in "$SV_ZAP_IMAGE" $SV_ZAP_IMAGES; do
+      printf '%s    ' "$sep"
+      image_record "$image"
+      sep=$',\n'
+    done
+    printf '\n  },\n  "modes": [\n'
+    sep=""
+    for mode in $SV_ZAP_MODES; do
+      if [ -f "$SV_ZAP_OUT/mode-$mode.json" ] && grep -q '"reportProduced": "yes"' "$SV_ZAP_OUT/mode-$mode.json"; then
+        samples="$(paste -sd, "$SV_ZAP_OUT/stats-$mode.jsonl" 2>/dev/null || true)"
+        printf '%s    { "record": %s, "memorySamples": [%s] }' "$sep" "$(cat "$SV_ZAP_OUT/mode-$mode.json")" "$samples"
+      else
+        SV_ZAP_MISSING=$((SV_ZAP_MISSING + 1))
+        printf '%s    { "mode": "%s", "status": "not run", "reason": "%s" }' "$sep" "$mode" "$SV_ZAP_STOP_REASON"
+      fi
+      sep=$',\n'
+    done
+    printf '\n  ]\n}\n'
+  } >"$SV_ZAP_OUT/venue.json"
+}
+
+start_deadline
+start_zap
+
+# The run sequence: a flat block of calls, one per line.
+# sequence:begin
+seed
+scan unauth-baseline
+scan unauth-active
+settle_cookie
+seed
+a01
+seed
+session_control customer before
+scan customer-baseline
+scan customer-active
+session_control customer after
+seed
+session_control admin before
+scan admin-baseline
+scan admin-active
+session_control admin after
+# sequence:end
