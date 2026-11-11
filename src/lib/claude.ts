@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { buildRoofContextPromptBlock, type RoofContext } from "@/lib/roofContext";
 import { buildPhotoLabelsBlock, type RoofPart } from "@/lib/photoTag";
+import { applyScoreCaps, rubricPromptSection } from "@/lib/scoringRubric";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -15,6 +16,12 @@ const DefectSchema = z.object({
   severity: z.enum(["low", "medium", "high", "critical"]),
   description: z.string().max(150),
   image_index: z.number().int().min(0),
+  // BL-009: how soon to act, whether it affects how the roof works, how much of
+  // the roof it covers, and where in the photo it is (never a measured slope, ADR-008).
+  priority: z.enum(["low", "medium", "high", "urgent"]),
+  category: z.enum(["cosmetic", "functional"]),
+  extent: z.enum(["small", "moderate", "large"]),
+  location: z.string().max(120),
 });
 
 export const RoofAnalysisSchema = z.object({
@@ -28,6 +35,21 @@ export const RoofAnalysisSchema = z.object({
 });
 
 export type RoofAnalysis = z.infer<typeof RoofAnalysisSchema>;
+
+export type Defect = z.infer<typeof DefectSchema>;
+
+/**
+ * A defect as stored on a report. Reports made before BL-009 have no
+ * priority, category, extent or location, so those are optional here.
+ */
+export type StoredDefect = Omit<Defect, "priority" | "category" | "extent" | "location"> &
+  Partial<Pick<Defect, "priority" | "category" | "extent" | "location">>;
+
+/** An analysis as rendered into a report or PDF: its defects may be stored ones. */
+export type ReportAnalysis = Omit<RoofAnalysis, "defects"> & { defects: StoredDefect[] };
+
+/** A validated analysis after the safety caps; `ai_condition_score` is the AI's own score when a cap lowered it. */
+export type CappedRoofAnalysis = RoofAnalysis & { ai_condition_score?: number };
 
 // ── The prompt ─────────────────────────────────────────────────────────────────
 // We ask Claude to return ONLY valid JSON — no markdown fences, no prose.
@@ -66,7 +88,11 @@ Return ONLY valid JSON matching this exact schema — no markdown, no prose, no 
     "type": "<missing_tiles|cracked_tiles|moss_growth|flashing_damage|gutter_damage|ridge_damage|valley_damage|other>",
     "severity": "<low|medium|high|critical>",
     "description": "<max 150 chars describing location and extent>",
-    "image_index": <0-based index of the image showing this defect>
+    "image_index": <0-based index of the image showing this defect>,
+    "priority": "<low|medium|high|urgent — how soon to act, per the rubric below>",
+    "category": "<cosmetic|functional — per the rubric below>",
+    "extent": "<small|moderate|large — how much of the visible roof it affects>",
+    "location": "<max 120 chars: where in that image the defect is, e.g. lower left, near the gutter>"
   }],
   "estimated_remaining_life_years": <integer or null if unable to estimate>,
   "recommendations": ["<specific action item>"],
@@ -75,13 +101,14 @@ Return ONLY valid JSON matching this exact schema — no markdown, no prose, no 
   "surveyor_notes": "<overall summary, max 1000 chars>"
 }
 
-Scoring guide:
-  1–3 = Replace soon (structural risk)
-  4–6 = Repair needed (significant defects)
-  7–9 = Maintenance recommended (minor issues)
-  10  = Excellent condition
+${rubricPromptSection()}
 
-List defects from most to least severe.
+Location: say where in the image the defect is (for example "lower left, near the gutter", "right of the
+chimney"). Never state a slope as measured or name a compass direction you cannot see; if the image has a customer
+label in <photo_labels>, you may refer to it only as the customer's label (for example "the photo labelled front
+slope").
+
+List defects from most to least urgent.
 If image quality prevents proper assessment, set confidence to "low" and note why.`;
 
 // ── Main export ────────────────────────────────────────────────────────────────
@@ -93,7 +120,7 @@ export async function analyzeRoof(
   customerNotes?: string,
   roofContext?: RoofContext | null,
   photoLabels?: readonly (readonly RoofPart[])[] | null
-): Promise<RoofAnalysis> {
+): Promise<CappedRoofAnalysis> {
   // Build the content array — one image block per photo
   // Claude Vision accepts up to 20 images per request
   const imageBlocks: Anthropic.ImageBlockParam[] = base64Images.map((data, i) => ({
@@ -159,5 +186,6 @@ export async function analyzeRoof(
     throw new Error(`Claude response failed validation: ${JSON.stringify(result.error.flatten())}`);
   }
 
-  return result.data;
+  // Safety caps (SPEC-010): a serious functional defect limits the score; the AI's own score is kept.
+  return applyScoreCaps(result.data);
 }

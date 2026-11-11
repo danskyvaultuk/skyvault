@@ -1,7 +1,8 @@
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from "@react-pdf/renderer";
 import React from "react";
-import type { RoofAnalysis } from "./claude";
+import type { ReportAnalysis } from "./claude";
 import { roofContextSummaryLines, type RoofContext } from "./roofContext";
+import { customerDefects } from "./defectDisplay";
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
@@ -66,9 +67,10 @@ const styles = StyleSheet.create({
   footerText: { fontSize: 8, color: "#9ca3af" },
 });
 
-// ── Severity colour ────────────────────────────────────────────────────────────
-function severityColour(s: string): string {
-  switch (s) {
+// ── Priority colour (BL-009; "critical" only on reports from before priorities) ─
+function priorityColour(key: string): string {
+  switch (key) {
+    case "urgent":
     case "critical": return "#b91c1c";
     case "high":     return "#d97706";
     case "medium":   return "#2563eb";
@@ -93,15 +95,18 @@ function ReportDocument({
   imageBase64s,
   customerNotes,
   roofContext,
+  photoRoofParts,
 }: {
-  analysis: RoofAnalysis;
+  analysis: ReportAnalysis;
   address: string;
   postcode: string;
   generatedAt: string;
   imageBase64s?: string[];
   customerNotes?: string | null;
   roofContext?: RoofContext | null;
+  photoRoofParts?: readonly (readonly string[])[];
 }) {
+  const defects = customerDefects(analysis.defects, photoRoofParts ?? []);
   const roofContextLines = roofContextSummaryLines(roofContext);
   const hasCustomerInfo = !!customerNotes || roofContextLines.length > 0;
   return (
@@ -184,15 +189,17 @@ function ReportDocument({
             <Text style={styles.sectionTitle}>
               Defects found ({analysis.defects.length})
             </Text>
-            {analysis.defects.map((d, i) => (
+            {defects.map((d, i) => (
               <View key={i} style={styles.defectRow}>
-                <Text style={[styles.defectSeverity, { color: severityColour(d.severity) }]}>
-                  {d.severity.toUpperCase()}
+                <Text style={[styles.defectSeverity, { color: priorityColour(d.key) }]}>
+                  {d.label.toUpperCase()}
                 </Text>
-                <Text style={styles.defectType}>
-                  {d.type.replace(/_/g, " ")}
-                </Text>
-                <Text style={styles.defectDesc}>{d.description}</Text>
+                <Text style={styles.defectType}>{d.typeText}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.defectDesc}>{d.description}</Text>
+                  <Text style={{ fontSize: 8, color: "#6b7280", marginTop: 2 }}>{d.locationText}</Text>
+                  {d.categoryText && <Text style={{ fontSize: 8, color: "#9ca3af" }}>{d.categoryText}</Text>}
+                </View>
               </View>
             ))}
           </View>
@@ -259,19 +266,20 @@ function ReportDocument({
 
 // ── Export ─────────────────────────────────────────────────────────────────────
 export async function renderReportPDF(
-  analysis: RoofAnalysis,
+  analysis: ReportAnalysis,
   address: string,
   postcode: string,
   imageBase64s?: string[],
   customerNotes?: string | null,
-  roofContext?: RoofContext | null
+  roofContext?: RoofContext | null,
+  photoRoofParts?: readonly (readonly string[])[]
 ): Promise<Buffer> {
   const generatedAt = new Date().toLocaleDateString("en-GB", {
     day: "numeric", month: "long", year: "numeric",
   });
 
   const element = React.createElement(ReportDocument, {
-    analysis, address, postcode, generatedAt, imageBase64s, customerNotes, roofContext,
+    analysis, address, postcode, generatedAt, imageBase64s, customerNotes, roofContext, photoRoofParts,
   }) as unknown as React.ReactElement<import("@react-pdf/renderer").DocumentProps>;
 
   const buffer = await renderToBuffer(element);

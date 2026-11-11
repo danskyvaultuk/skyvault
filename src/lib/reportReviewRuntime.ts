@@ -19,7 +19,7 @@ export function buildReportReview(): ReportReview {
               roofContext: true,
               property: { select: { address: true, postcode: true } },
               customer: { select: { email: true, name: true } },
-              images: { orderBy: { sortOrder: "asc" }, select: { s3Key: true, originalFilename: true } },
+              images: { orderBy: { sortOrder: "asc" }, select: { s3Key: true, originalFilename: true, roofParts: true } },
             },
           },
         },
