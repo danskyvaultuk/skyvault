@@ -265,3 +265,26 @@ describe("runAnalysisPipeline — priorities, locations and score caps (BL-003 /
     expect(data.rawAiResponse).toMatchObject({ condition_score: 3, ai_condition_score: 8 });
   });
 });
+
+describe("runAnalysisPipeline — recorded timing (BL-023 / SPEC-015 C)", () => {
+  it("stores the model and both times with the AI's answer, and logs them", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+
+    await runAnalysisPipeline("survey-1");
+
+    const meta = mockReportCreate.mock.calls[0][0].data.rawAiResponse.analysis_meta;
+    expect(meta.model).toBe("claude-opus-5-5");
+    expect(Number.isInteger(meta.ai_ms) && meta.ai_ms >= 0).toBe(true);
+    expect(Number.isInteger(meta.total_ms) && meta.total_ms >= meta.ai_ms).toBe(true);
+    const timingLine = log.mock.calls.map((c) => String(c[0])).find((l) => l.includes("[pipeline] timing"));
+    expect(timingLine).toMatch(/survey=survey-1 model=claude-opus-5-5 ai_ms=\d+ total_ms=\d+/);
+    log.mockRestore();
+  });
+
+  it("keeps the AI's own answer fields beside the timing", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+    await runAnalysisPipeline("survey-1");
+    expect(mockReportCreate.mock.calls[0][0].data.rawAiResponse).toMatchObject({ condition_score: 8, confidence: "high" });
+  });
+});
