@@ -24,6 +24,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id: surveyId } = await params;
+  const survey = await prisma.survey.findUnique({
+    where: { id: surveyId },
+    include: { droneJob: true },
+  });
+
+  if (!survey) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const isOwner = survey.customerId === session.user.id;
+  const isOperator =
+    session.user.role === "drone" &&
+    survey.droneJob?.operatorId === session.user.id;
+  if (!isOwner && !isOperator && session.user.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const images = await prisma.image.findMany({
     where: { surveyId },
     orderBy: { sortOrder: "asc" },

@@ -3,6 +3,8 @@ import { JourneyGuard } from "./journeyGuard";
 
 const OFF = new JourneyGuard({ droneEnabled: false, rooferEnabled: false });
 const ON = new JourneyGuard({ droneEnabled: true, rooferEnabled: true });
+const ONLY_ROOFER = new JourneyGuard({ droneEnabled: false, rooferEnabled: true });
+const ONLY_DRONE = new JourneyGuard({ droneEnabled: true, rooferEnabled: false });
 
 const DRONE_APIS = ["/api/drone-jobs", "/api/drone-jobs/job-1", "/api/stripe/drone-checkout"];
 const ROOFER_APIS = [
@@ -71,5 +73,25 @@ describe("JourneyGuard with both journeys on", () => {
     expect(ON.homeFor("roofer")).toBe("/roofer/dashboard");
     expect(ON.homeFor("drone")).toBe("/drone/dashboard");
     expect(ON.pageDecision("/roofer/dashboard", "roofer")).toEqual({ kind: "allow" });
+  });
+});
+
+describe("JourneyGuard with only the roofer journey on", () => {
+  it.each(DRONE_APIS)("refuses the drone API %s", (path) => {
+    expect(ONLY_ROOFER.apiDecision(path)).toBe("not-found");
+  });
+
+  it.each(ROOFER_APIS)("allows the roofer API %s", (path) => {
+    expect(ONLY_ROOFER.apiDecision(path)).toBe("allow");
+  });
+});
+
+describe("JourneyGuard with only the drone journey on", () => {
+  it.each(ROOFER_APIS)("refuses the roofer API %s", (path) => {
+    expect(ONLY_DRONE.apiDecision(path)).toBe("not-found");
+  });
+
+  it.each(DRONE_APIS)("allows the drone API %s", (path) => {
+    expect(ONLY_DRONE.apiDecision(path)).toBe("allow");
   });
 });
