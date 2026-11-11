@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { customerDefects } from "./defectDisplay";
+import { customerDefectSections, customerDefects } from "./defectDisplay";
 import type { StoredDefect } from "./claude";
 
 const base = { type: "flashing_damage", severity: "high", description: "Lifted flashing", image_index: 2 } as const;
@@ -55,5 +55,47 @@ describe("customerDefects", () => {
     expect(shown.categoryText).toBeNull();
     expect(shown.locationText).toBe("Seen in photo 1 (your ridge photo)");
     expect(shown.description).toBe("Lifted flashing");
+  });
+});
+
+describe("customerDefectSections — peripheral concerns (BL-004)", () => {
+  const zoned = (zone: StoredDefect["zone"], priority: StoredDefect["priority"], location: string): StoredDefect => ({
+    ...base, priority, category: "functional", extent: "small", location, zone,
+  });
+
+  it("puts defects in a peripheral zone in their own section, naming the zone, and the rest in the main list", () => {
+    const sections = customerDefectSections(
+      [
+        zoned("none", "low", "middle of the slope"),
+        zoned("eaves", "medium", "along the lower edge"),
+        zoned("none", "urgent", "near the ridge"),
+        zoned("drainage_point", "high", "gutter outlet, right"),
+      ],
+      PHOTOS
+    );
+    expect(sections.peripheral.map((d) => [d.label, d.zoneText])).toEqual([
+      ["High", "Drainage point"],
+      ["Medium", "Eaves"],
+    ]);
+    expect(sections.other.map((d) => [d.label, d.zoneText])).toEqual([
+      ["Urgent", null],
+      ["Low", null],
+    ]);
+  });
+
+  it("gives a peripheral defect the same label, location and category text as any other", () => {
+    const [shown] = customerDefectSections([zoned("fascia", "high", "lower left")], PHOTOS).peripheral;
+    expect(shown).toMatchObject({
+      label: "High",
+      locationText: "Seen in photo 3 (your front slope photo): lower left",
+      categoryText: "Functional — affects how the roof works",
+    });
+  });
+
+  it("keeps every defect from before zones existed in the main list, with no peripheral section", () => {
+    const sections = customerDefectSections([{ ...base, severity: "medium", image_index: 0 }], PHOTOS);
+    expect(sections.peripheral).toEqual([]);
+    expect(sections.other).toHaveLength(1);
+    expect(sections.other[0].zoneText).toBeNull();
   });
 });
