@@ -66,7 +66,7 @@ pull_images() {
 build_image() {
   # A dedicated builder, removed by cleanup with its state and cache. It needs egress for the npm registry and
   # fonts, so the build is not on the internal network. The default builder is never touched.
-  docker buildx create --name "$SV_ZAP_BUILDER" --driver docker-container
+  docker buildx inspect sv-zap-builder >/dev/null 2>&1 || docker buildx create --name "$SV_ZAP_BUILDER" --driver docker-container
   docker buildx build --builder "$SV_ZAP_BUILDER" --load -t "$SV_ZAP_IMAGE" -f security/zap/Dockerfile .
 }
 
@@ -189,18 +189,6 @@ a01() {
     node security/zap/a01-requests.mjs >"$SV_ZAP_OUT/a01-requests.json"
 }
 
-# The throwaway signing secret exists only in this shell variable, for this run.
-AUTH_SECRET="$(openssl rand -base64 32)"
-mkdir -p "$SV_ZAP_OUT"
-
-pull_images
-build_image
-create_network
-start_db
-migrate
-start_app
-wait_for_app
-
 # A background timer sends TERM to this script at the overall deadline, so the trap still cleans up by name.
 # It is killed on a normal exit by cleanup.
 start_deadline() {
@@ -307,7 +295,19 @@ write_venue() {
   } >"$SV_ZAP_OUT/venue.json"
 }
 
+# Every top-level step sits below every function definition, so the cleanup trap can call write_venue whenever
+# it fires, and the overall deadline covers the pull and the build too.
+# The throwaway signing secret exists only in this shell variable, for this run.
+AUTH_SECRET="$(openssl rand -base64 32)"
+mkdir -p "$SV_ZAP_OUT"
 start_deadline
+pull_images
+build_image
+create_network
+start_db
+migrate
+start_app
+wait_for_app
 start_zap
 
 # The run sequence: a flat block of calls, one per line.
