@@ -201,6 +201,9 @@ describe("analyzeRoof — defect priority, location and the rubric (BL-003 / BL-
     expect(system).toContain('"extent": "<small|moderate|large');
     expect(system).toContain('"location":');
     expect(system).toMatch(/never state a slope as measured/i);
+    expect(system).toMatch(/Functional defects lower the score far\s+more than cosmetic ones/);
+    expect(system).toContain('"description": "<max 150 chars describing location and extent>"');
+    expect(system).toContain('"image_index": <0-based index of the image showing this defect>');
     expect(system).toContain('"type": "<missing_tiles|cracked_tiles|moss_growth|flashing_damage|gutter_damage|ridge_damage|valley_damage|other>"');
   });
 });

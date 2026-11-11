@@ -283,3 +283,14 @@ describe("correctionValues — loading a report into the review form", () => {
     expect(values.defects[0]).toMatchObject({ priority: "urgent", location: "top" });
   });
 });
+
+describe("ReportReview.approve — a report whose score was capped (SPEC-010 C2)", () => {
+  it("approves an uncorrected capped report as published, not overridden", async () => {
+    const capped = { ...AI_RAW, condition_score: 3, ai_condition_score: 7 };
+    useReport(makeReport("draft", { conditionScore: 3, rawAiResponse: capped }));
+
+    expect(wasCorrected(makeReport("draft", { conditionScore: 3, rawAiResponse: capped }))).toBe(false);
+    expect(await review.approve("report-1")).toEqual({ ok: true, status: "published" });
+    expect(deps.updateReport).toHaveBeenCalledWith("report-1", { status: "published" });
+  });
+});

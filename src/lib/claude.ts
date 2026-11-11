@@ -87,7 +87,7 @@ Return ONLY valid JSON matching this exact schema — no markdown, no prose, no 
   "defects": [{
     "type": "<missing_tiles|cracked_tiles|moss_growth|flashing_damage|gutter_damage|ridge_damage|valley_damage|other>",
     "severity": "<low|medium|high|critical>",
-    "description": "<max 150 chars describing the defect>",
+    "description": "<max 150 chars describing location and extent>",
     "image_index": <0-based index of the image showing this defect>,
     "priority": "<low|medium|high|urgent — how soon to act, per the rubric below>",
     "category": "<cosmetic|functional — per the rubric below>",
