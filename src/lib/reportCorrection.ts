@@ -1,6 +1,10 @@
 // What an admin may change on a report (BL-015 / BL-061). Client-safe: the
-// review form imports the lists below, so this module imports only zod.
+// review form imports the lists below, so this module imports only zod and the
+// import-free zone list.
 import { z } from "zod";
+import { DEFECT_ZONES } from "@/lib/peripheralZones";
+
+export { DEFECT_ZONES };
 
 export const DEFECT_TYPES = [
   "missing_tiles", "cracked_tiles", "moss_growth", "flashing_damage",
@@ -22,6 +26,8 @@ export const CorrectedDefectSchema = z.object({
   category: z.enum(DEFECT_CATEGORIES).optional(),
   extent: z.enum(DEFECT_EXTENTS).optional(),
   location: z.string().trim().max(120).optional(),
+  // BL-004. Optional, because reports made before BL-004 have none.
+  zone: z.enum(DEFECT_ZONES).optional(),
 });
 
 export const ReportCorrectionSchema = z.object({

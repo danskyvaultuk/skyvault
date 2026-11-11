@@ -8,6 +8,7 @@ import {
   DEFECT_PRIORITIES,
   DEFECT_SEVERITIES,
   DEFECT_TYPES,
+  DEFECT_ZONES,
   type CorrectedDefect,
   type ReportCorrection,
 } from "@/lib/reportCorrection";
@@ -16,7 +17,7 @@ type Props = { reportId: string; held: boolean; photoCount: number; initial: Rep
 
 const BLANK_DEFECT: CorrectedDefect = {
   type: "other", severity: "medium", description: "", image_index: 0,
-  priority: "medium", category: "functional", extent: "small",
+  priority: "medium", category: "functional", extent: "small", zone: "none",
 };
 
 const INPUT = "border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -66,6 +67,7 @@ function DefectRow({
         <OptionalSelect label="Priority" value={defect.priority} options={DEFECT_PRIORITIES} onChange={(priority) => onChange({ ...defect, priority })} />
         <OptionalSelect label="Category" value={defect.category} options={DEFECT_CATEGORIES} onChange={(category) => onChange({ ...defect, category })} />
         <OptionalSelect label="Extent" value={defect.extent} options={DEFECT_EXTENTS} onChange={(extent) => onChange({ ...defect, extent })} />
+        <OptionalSelect label="Zone" value={defect.zone} options={DEFECT_ZONES} onChange={(zone) => onChange({ ...defect, zone })} />
       </div>
       <input
         className={`${INPUT} w-full`} maxLength={150} placeholder="Description (up to 150 characters)"
