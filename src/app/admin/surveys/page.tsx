@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { reviewStatus } from "@/lib/reviewStatus";
 
 const STATUS_COLOURS: Record<string, string> = {
   draft:     "bg-gray-100 text-gray-600",
@@ -15,7 +16,7 @@ export default async function AdminSurveysPage() {
     include: {
       property: true,
       customer: { select: { name: true, email: true } },
-      report: { select: { conditionScore: true, status: true } },
+      report: { select: { id: true, conditionScore: true, status: true } },
       _count: { select: { images: true } },
     },
   });
@@ -65,14 +66,7 @@ export default async function AdminSurveysPage() {
                   {new Date(s.createdAt).toLocaleDateString("en-GB")}
                 </td>
                 <td className="px-5 py-3">
-                  {s.report && (
-                    <Link
-                      href={`/surveys/${s.id}/report`}
-                      className="text-blue-600 hover:underline text-xs font-medium"
-                    >
-                      View report
-                    </Link>
-                  )}
+                  {s.report && <ReportLinks surveyId={s.id} report={s.report} />}
                 </td>
               </tr>
             ))}
@@ -85,6 +79,38 @@ export default async function AdminSurveysPage() {
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+// BL-068: every report can be reached for review from here, whatever its
+// status, so a released report's review page (and its re-send button) is
+// always one click away.
+function ReportLinks({
+  surveyId,
+  report,
+}: {
+  surveyId: string;
+  report: { id: string; status: Parameters<typeof reviewStatus>[0] };
+}) {
+  const review = reviewStatus(report.status);
+  return (
+    <div className="flex flex-col items-start gap-1 text-xs">
+      <span
+        className={`font-medium px-2 py-0.5 rounded-full ${
+          review.waiting ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"
+        }`}
+      >
+        {review.label}
+      </span>
+      <div className="flex gap-3">
+        <Link href={`/admin/reports/${report.id}`} className="text-blue-600 hover:underline font-medium">
+          Review
+        </Link>
+        <Link href={`/surveys/${surveyId}/report`} className="text-blue-600 hover:underline font-medium">
+          View report
+        </Link>
       </div>
     </div>
   );
