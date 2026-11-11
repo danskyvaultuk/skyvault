@@ -66,6 +66,12 @@ jobs:
   - type: passiveScan-wait
     parameters:
       maxDuration: 5
+  - type: export
+    parameters:
+      context: skyvault
+      type: har
+      source: all
+      fileName: /zap/wrk/out/history-customer-baseline.har
   - type: report
     parameters:
       template: traditional-json

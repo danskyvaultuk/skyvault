@@ -78,9 +78,10 @@ Two helpers shrink the raw output for the record:
     node security/zap/slim-report.mjs <raw report> <mode> <out>   # keeps pluginid, alert, riskdesc, cweid, tags,
                                                                   # count and at most five instance URIs per alert
     node security/zap/gated-status.mjs <har file>                 # status code of each journey-gated path
+    node security/zap/har-auth-proof.mjs <har file>               # GET /api/properties answered 200 (authenticated baselines)
 
 ## Self-tests
 
 `selftest-redact.mjs`, `selftest-mint.mjs` and `selftest-slim.mjs` build their fixtures at run time in a scratch
 directory inside the git directory and remove it afterwards. They are named `selftest-*` so the project's test
-runner does not collect them.
+runner does not collect them. `selftest-cap.mjs` and `selftest-auth-proof.mjs` assemble their synthetic logs and HARs in memory: the first feeds `cap-reached.awk`, which run.sh uses to read whether a job reached its cap; the second feeds `har-auth-proof.mjs`, the positive control that the customer and admin baselines' own ZAP traffic carried the session cookie (recorded as `authProof` in the mode record; a failure stops the run before that identity's active mode).

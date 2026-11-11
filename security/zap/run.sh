@@ -18,6 +18,8 @@ SV_ZAP_BUILDKIT_IMAGE=moby/buildkit:buildx-stable-1
 SV_ZAP_IMAGES="node:22-bookworm zaproxy/zap-stable postgres:16"
 SV_ZAP_DEADLINE_MINS="${SV_ZAP_DEADLINE_MINS:-170}"
 SV_ZAP_MODES="unauth-baseline unauth-active customer-baseline customer-active admin-baseline admin-active"
+SV_ZAP_SPIDER_CAP_MINS=3
+SV_ZAP_PASSIVE_CAP_MINS=5
 SV_ZAP_ACTIVE_CAP_MINS=20
 SV_ZAP_TIMER=""
 SV_ZAP_STOP_REASON="not reached"
@@ -240,13 +242,32 @@ scan() {
   produced=no
   if docker cp "$SV_ZAP_ZAP:/zap/wrk/out/report-$mode.json" "$SV_ZAP_OUT/report-$mode.json" 2>/dev/null; then produced=yes; fi
   docker cp "$SV_ZAP_ZAP:/zap/wrk/out/history-$mode.har" "$SV_ZAP_OUT/history-$mode.har" 2>/dev/null || true
+  # Positive control for the authenticated baselines: ZAP's own traffic must have been answered as the identity.
+  proof=n/a
+  case "$mode" in
+    customer-baseline|admin-baseline)
+      proof=failed
+      if [ -f "$SV_ZAP_OUT/history-$mode.har" ] \
+        && proof_line="$(sv_run --rm -i "$SV_ZAP_IMAGE" node security/zap/har-auth-proof.mjs - <"$SV_ZAP_OUT/history-$mode.har")"; then
+        proof="$proof_line"
+      fi ;;
+  esac
   cap=no
-  if grep -qiE 'max(imum)?[ _-]*duration|duration.*(reached|exceeded)' "$SV_ZAP_OUT/zap-$mode.log" 2>/dev/null; then cap=yes; fi
+  # Whether a job reached its cap is read from the job's own "time taken" line (security/zap/cap-reached.awk).
+  if [ -f "$SV_ZAP_OUT/zap-$mode.log" ]; then
+    cap="$(awk -v spider=$(( SV_ZAP_SPIDER_CAP_MINS * 60 )) -v passive=$(( SV_ZAP_PASSIVE_CAP_MINS * 60 )) \
+      -v active=$(( SV_ZAP_ACTIVE_CAP_MINS * 60 )) -f security/zap/cap-reached.awk "$SV_ZAP_OUT/zap-$mode.log")"
+  fi
   if [ "$mode" != "${mode%-active}" ] && [ "$seconds" -ge $(( SV_ZAP_ACTIVE_CAP_MINS * 60 )) ]; then cap=yes; fi
-  printf '{ "mode": "%s", "startedEpoch": %s, "durationSeconds": %s, "zapExit": %s, "reportProduced": "%s", "capReached": "%s" }\n' \
-    "$mode" "$started" "$seconds" "$rc" "$produced" "$cap" >"$SV_ZAP_OUT/mode-$mode.json"
+  printf '{ "mode": "%s", "startedEpoch": %s, "durationSeconds": %s, "zapExit": %s, "reportProduced": "%s", "capReached": "%s", "authProof": "%s" }\n' \
+    "$mode" "$started" "$seconds" "$rc" "$produced" "$cap" "$proof" >"$SV_ZAP_OUT/mode-$mode.json"
   if [ "$rc" -ne 0 ] && [ "$rc" -ne 2 ]; then
     SV_ZAP_STOP_REASON="$mode: ZAP exited $rc"
+    echo "run.sh: $SV_ZAP_STOP_REASON; the remaining steps are skipped" >&2
+    return 1
+  fi
+  if [ "$proof" = failed ]; then
+    SV_ZAP_STOP_REASON="$mode: ZAP traffic for ${mode%-baseline} was not authenticated"
     echo "run.sh: $SV_ZAP_STOP_REASON; the remaining steps are skipped" >&2
     return 1
   fi
