@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  DEFECT_CATEGORIES,
+  DEFECT_EXTENTS,
+  DEFECT_PRIORITIES,
   DEFECT_SEVERITIES,
   DEFECT_TYPES,
   type CorrectedDefect,
@@ -11,9 +14,27 @@ import {
 
 type Props = { reportId: string; held: boolean; photoCount: number; initial: ReportCorrection };
 
-const BLANK_DEFECT: CorrectedDefect = { type: "other", severity: "medium", description: "", image_index: 0 };
+const BLANK_DEFECT: CorrectedDefect = {
+  type: "other", severity: "medium", description: "", image_index: 0,
+  priority: "medium", category: "functional", extent: "small",
+};
 
 const INPUT = "border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+// A choice a defect from before BL-009 may not have yet: "not set" leaves it unset.
+function OptionalSelect<T extends string>({
+  label, value, options, onChange,
+}: { label: string; value: T | undefined; options: readonly T[]; onChange: (v: T | undefined) => void }) {
+  return (
+    <label className="text-xs text-gray-500">
+      {label}{" "}
+      <select className={INPUT} value={value ?? ""} onChange={(e) => onChange((e.target.value || undefined) as T | undefined)}>
+        <option value="">not set</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </label>
+  );
+}
 
 function DefectRow({
   defect, index, photoCount, onChange, onRemove,
@@ -41,9 +62,18 @@ function DefectRow({
         </label>
         <button type="button" onClick={onRemove} className="ml-auto text-sm text-red-600 hover:underline">Delete</button>
       </div>
+      <div className="flex flex-wrap gap-2 items-center">
+        <OptionalSelect label="Priority" value={defect.priority} options={DEFECT_PRIORITIES} onChange={(priority) => onChange({ ...defect, priority })} />
+        <OptionalSelect label="Category" value={defect.category} options={DEFECT_CATEGORIES} onChange={(category) => onChange({ ...defect, category })} />
+        <OptionalSelect label="Extent" value={defect.extent} options={DEFECT_EXTENTS} onChange={(extent) => onChange({ ...defect, extent })} />
+      </div>
       <input
         className={`${INPUT} w-full`} maxLength={150} placeholder="Description (up to 150 characters)"
         value={defect.description} onChange={(e) => onChange({ ...defect, description: e.target.value })}
+      />
+      <input
+        className={`${INPUT} w-full`} maxLength={120} placeholder="Where in the photo, e.g. lower left, near the gutter (up to 120 characters)"
+        value={defect.location ?? ""} onChange={(e) => onChange({ ...defect, location: e.target.value || undefined })}
       />
     </div>
   );

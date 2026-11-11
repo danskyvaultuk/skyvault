@@ -26,7 +26,7 @@ export type ReviewReport = {
     roofContext: unknown;
     property: { address: string; postcode: string };
     customer: { email: string; name: string | null };
-    images: SurveyPhoto[];
+    images: (SurveyPhoto & { roofParts?: string[] })[];
   };
 };
 
@@ -49,7 +49,8 @@ export type ReportReviewDeps = {
     postcode: string,
     imageBase64s: string[],
     customerNotes: string | null,
-    roofContext: RoofContext | null
+    roofContext: RoofContext | null,
+    photoRoofParts: readonly (readonly string[])[]
   ): Promise<Buffer>;
   storePdf(key: string, pdf: Buffer): Promise<void>;
   pdfKeyFor(surveyId: string): string;
@@ -155,7 +156,8 @@ export class ReportReview {
       survey.property.postcode,
       photos.map((p) => p.base64),
       survey.notes,
-      roofContext.success ? roofContext.data : null
+      roofContext.success ? roofContext.data : null,
+      survey.images.map((img) => img.roofParts ?? [])
     );
     const key = report.pdfS3Key ?? this.deps.pdfKeyFor(report.surveyId);
     await this.deps.storePdf(key, pdf);

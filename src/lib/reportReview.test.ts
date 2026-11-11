@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ReportStatus } from "@prisma/client";
 import { ReportReview, wasCorrected, type ReviewReport, type ReportReviewDeps } from "./reportReview";
+import { correctionValues } from "./reportCorrection";
 
 const AI_DEFECTS = [
   { type: "moss_growth", severity: "low", description: "Moss on the north slope", image_index: 0 },
@@ -212,5 +213,73 @@ describe("ReportReview.resendEmail", () => {
     useReport(null);
     expect(await review.resendEmail("missing")).toMatchObject({ ok: false, reason: "not-found" });
     expect(deps.notifyCustomer).not.toHaveBeenCalled();
+  });
+});
+
+describe("ReportReview.correct — priority, category, extent and location (BL-009)", () => {
+  const NEW_STYLE = {
+    type: "flashing_damage",
+    severity: "high",
+    description: "Lifted flashing at the chimney",
+    image_index: 0,
+    priority: "urgent",
+    category: "functional",
+    extent: "small",
+    location: "right of the chimney",
+  };
+
+  it("accepts a correction carrying the new fields and puts them, with the photo labels, into the re-made PDF", async () => {
+    useReport(
+      makeReport("draft", {
+        survey: { ...makeReport("draft").survey, images: [{ s3Key: "k0", originalFilename: "0.jpg", roofParts: ["front"] }] },
+      })
+    );
+
+    const result = await review.correct("report-1", { ...CORRECTION, defects: [NEW_STYLE] });
+
+    expect(result).toEqual({ ok: true, status: "draft" });
+    const [analysis, , , , , , photoRoofParts] = deps.renderPdf.mock.calls[0];
+    expect(analysis.defects[0]).toMatchObject({ priority: "urgent", category: "functional", extent: "small", location: "right of the chimney" });
+    expect(photoRoofParts).toEqual([["front"]]);
+    expect(deps.updateReport.mock.calls[0][1].defectsJson[0]).toMatchObject({ priority: "urgent" });
+  });
+
+  it("refuses an unknown priority and changes nothing", async () => {
+    useReport(makeReport("draft"));
+    const result = await review.correct("report-1", { ...CORRECTION, defects: [{ ...NEW_STYLE, priority: "whenever" }] });
+    expect(result).toMatchObject({ ok: false, reason: "invalid" });
+    expect(deps.updateReport).not.toHaveBeenCalled();
+  });
+
+  it("still accepts a defect from before BL-009, without the new fields", async () => {
+    useReport(makeReport("draft"));
+    const result = await review.correct("report-1", CORRECTION);
+    expect(result).toEqual({ ok: true, status: "draft" });
+  });
+});
+
+describe("correctionValues — loading a report into the review form", () => {
+  it("lists every stored defect from before BL-009, none dropped", () => {
+    const values = correctionValues({
+      conditionScore: 6,
+      defectsJson: [
+        { type: "moss_growth", severity: "low", description: "Moss", image_index: 0 },
+        { type: "cracked_tiles", severity: "high", description: "Cracked tile", image_index: 1 },
+      ],
+      recommendations: ["Clear the moss"],
+      adminNotes: null,
+    });
+    expect(values.defects).toHaveLength(2);
+    expect(values.defects[1]).toMatchObject({ type: "cracked_tiles", severity: "high" });
+  });
+
+  it("lists new-style defects with their priority and location", () => {
+    const values = correctionValues({
+      conditionScore: 3,
+      defectsJson: [{ type: "other", severity: "high", description: "x", image_index: 0, priority: "urgent", category: "functional", extent: "large", location: "top" }],
+      recommendations: [],
+      adminNotes: "note",
+    });
+    expect(values.defects[0]).toMatchObject({ priority: "urgent", location: "top" });
   });
 });
