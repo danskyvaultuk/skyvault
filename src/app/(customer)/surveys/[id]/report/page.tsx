@@ -6,6 +6,7 @@ import { isReportReleased } from "@/lib/reportRelease";
 import { customerDefectSections } from "@/lib/defectDisplay";
 import { customerAssessmentGaps, storedReviewFlags } from "@/lib/reviewFlags";
 import { AssessmentGapsCard, DefectCard } from "@/components/reports/report-sections";
+import { AdminViewBar } from "@/components/reports/admin-view-bar";
 import type { StoredDefect } from "@/lib/claude";
 import { RooferRequestSection } from "./roofer-request";
 import { notFound, redirect } from "next/navigation";
@@ -101,19 +102,13 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="p-8 max-w-3xl">
+      {/* An admin always sees it is the customer's view, with a way back (BL-070). */}
+      {isAdmin && <AdminViewBar reportId={report.id} held={!released} />}
+
       {/* Back link */}
       <Link href={`/surveys/${surveyId}`} className="text-sm text-blue-600 hover:underline mb-6 inline-block">
         ← Back to survey
       </Link>
-
-      {!released && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-6">
-          <p className="text-amber-800 font-semibold text-sm">Held for review: the customer cannot see this report yet.</p>
-          <Link href={`/admin/reports/${report.id}`} className="text-sm text-amber-700 hover:underline">
-            Review and approve →
-          </Link>
-        </div>
-      )}
 
       {/* Header */}
       <div className="mb-8">
