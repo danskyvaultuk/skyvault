@@ -7,6 +7,7 @@ import { getPresignedReadUrl } from "@/lib/r2";
 import { isReportReleased } from "@/lib/reportRelease";
 import { correctionValues, type ReportCorrection } from "@/lib/reportCorrection";
 import { ReviewForm } from "./review-form";
+import { analysisTiming, type AnalysisTiming } from "@/lib/analysisTiming";
 import { customerDefectSections } from "@/lib/defectDisplay";
 import { REVIEW_FLAG_LABELS, customerAssessmentGaps, storedReviewFlags, type ReviewFlag } from "@/lib/reviewFlags";
 import { AssessmentGapsCard, DefectCard } from "@/components/reports/report-sections";
@@ -57,6 +58,17 @@ function AiOriginal({ ai }: { ai: AiAnswer }) {
         {ai.surveyor_notes && <p><span className="font-medium">Surveyor notes:</span> {ai.surveyor_notes}</p>}
       </div>
     </details>
+  );
+}
+
+// BL-023 / BL-067: which model wrote the report and how long the analysis took.
+function TimingLine({ timing }: { timing: AnalysisTiming | null }) {
+  if (!timing) return null;
+  return (
+    <p className={`text-sm mb-6 ${timing.slow ? "text-amber-700" : "text-gray-500"}`}>
+      Analysed by {timing.model} in {timing.totalSeconds} s (AI {timing.aiSeconds} s)
+      {timing.slow && " — slower than the 60-second target"}
+    </p>
   );
 }
 
@@ -193,6 +205,8 @@ export default async function ReviewReportPage({ params }: { params: Promise<{ i
           </div>
         </div>
       )}
+
+      <TimingLine timing={analysisTiming(report.rawAiResponse)} />
 
       <ReviewFlags flags={flags} />
 
