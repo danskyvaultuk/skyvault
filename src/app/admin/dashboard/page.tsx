@@ -1,5 +1,44 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { appBaseUrlWithSource } from "@/lib/appUrl";
+import { authBaseUrl } from "@/lib/authUrl";
+import { siteAddressReport, type AddressLine } from "@/lib/siteAddressCheck";
+
+// BL-069: the addresses email links and login use, so a stale setting is seen
+// here first. Only addresses and setting names are shown, never a secret.
+async function siteAddressLines(): Promise<AddressLine[]> {
+  const h = await headers();
+  return siteAddressReport({
+    email: appBaseUrlWithSource({
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+      VERCEL_PROJECT_PRODUCTION_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    }),
+    login: authBaseUrl({ AUTH_URL: process.env.AUTH_URL, NEXTAUTH_URL: process.env.NEXTAUTH_URL }),
+    viewingHost: h.get("x-forwarded-host") ?? h.get("host"),
+  });
+}
+
+function SiteAddresses({ lines }: { lines: AddressLine[] }) {
+  const warned = lines.some((l) => l.warnings.length > 0);
+  return (
+    <div className={`border rounded-xl p-5 mb-8 ${warned ? "bg-amber-50 border-amber-200" : "bg-white"}`}>
+      <h2 className="font-semibold text-gray-900 mb-2">Site addresses</h2>
+      <ul className="space-y-2 text-sm">
+        {lines.map((l) => (
+          <li key={l.label}>
+            <span className="text-gray-500">{l.label}:</span>{" "}
+            <span className="font-medium text-gray-900 break-all">{l.address}</span>{" "}
+            <span className="text-gray-400">(from {l.sourceText})</span>
+            {l.warnings.map((w) => (
+              <p key={w} className="text-amber-800">⚠ {w}</p>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const SCORE_COLOUR = (score: number) =>
   score <= 3 ? "text-red-600" : score <= 6 ? "text-amber-500" : "text-green-600";
@@ -49,6 +88,7 @@ export default async function AdminDashboard() {
       },
     }),
   ]);
+  const addressLines = await siteAddressLines();
 
   const stats = [
     { label: "Total users", value: userCount, href: "/admin/users" },
@@ -62,6 +102,8 @@ export default async function AdminDashboard() {
   return (
     <div className="p-4 md:p-8 max-w-5xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
+
+      <SiteAddresses lines={addressLines} />
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-10">
