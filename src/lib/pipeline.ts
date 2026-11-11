@@ -9,6 +9,17 @@ import { fetchSurveyPhotos } from "@/lib/surveyImages";
 import { analysisModel } from "@/lib/analysisModel";
 import type { AnalysisMeta } from "@/lib/analysisTiming";
 
+/** The model and times of one analysis, logged and kept with the AI's answer for the admin (SPEC-015 C). */
+function recordTiming(surveyId: string, aiMs: number, startedAt: number): AnalysisMeta {
+  const meta: AnalysisMeta = {
+    model: analysisModel({ SKYVAULT_ANALYSIS_MODEL: process.env.SKYVAULT_ANALYSIS_MODEL }),
+    ai_ms: aiMs,
+    total_ms: Date.now() - startedAt,
+  };
+  console.log(`[pipeline] timing survey=${surveyId} model=${meta.model} ai_ms=${meta.ai_ms} total_ms=${meta.total_ms}`);
+  return meta;
+}
+
 /**
  * Runs the full AI analysis pipeline for a survey.
  *
@@ -87,15 +98,7 @@ export async function runAnalysisPipeline(surveyId: string) {
     console.log(`[pipeline] PDF uploaded: ${pdfKey}`);
 
     // ── Step 7: Save Report record ─────────────────────────────────────────
-    // The model and times are kept with the AI's answer for the admin (SPEC-015 C).
-    const analysisMeta: AnalysisMeta = {
-      model: analysisModel({ SKYVAULT_ANALYSIS_MODEL: process.env.SKYVAULT_ANALYSIS_MODEL }),
-      ai_ms: aiMs,
-      total_ms: Date.now() - startedAt,
-    };
-    console.log(
-      `[pipeline] timing survey=${surveyId} model=${analysisMeta.model} ai_ms=${analysisMeta.ai_ms} total_ms=${analysisMeta.total_ms}`
-    );
+    const analysisMeta = recordTiming(surveyId, aiMs, startedAt);
     const report = await prisma.report.create({
       data: {
         surveyId,
