@@ -3,17 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { getPresignedReadUrl } from "@/lib/r2";
 import { roofContextSummaryLines, type RoofContext } from "@/lib/roofContext";
 import { isReportReleased } from "@/lib/reportRelease";
+import { customerDefectSections } from "@/lib/defectDisplay";
+import { customerAssessmentGaps, storedReviewFlags } from "@/lib/reviewFlags";
+import { AssessmentGapsCard, DefectCard } from "@/components/reports/report-sections";
+import type { StoredDefect } from "@/lib/claude";
 import { RooferRequestSection } from "./roofer-request";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-
-// Severity badge colours
-const SEVERITY_STYLES: Record<string, string> = {
-  critical: "bg-red-100 text-red-700",
-  high:     "bg-orange-100 text-orange-700",
-  medium:   "bg-blue-100 text-blue-700",
-  low:      "bg-gray-100 text-gray-600",
-};
 
 function ScoreGauge({ score }: { score: number }) {
   const colour =
@@ -82,10 +78,15 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   if (!released && !isAdmin) return <BeingCheckedNotice surveyId={surveyId} />;
 
   // Parse JSON fields from the database
-  const defects = (report.defectsJson as Array<{
-    type: string; severity: string; description: string; image_index: number;
-  }>);
+  // Priority-labelled, most urgent first, located by photo (BL-009 / ADR-008);
+  // peripheral zones in their own section (BL-004).
+  const defects = customerDefectSections(
+    (report.defectsJson as StoredDefect[] | null) ?? [],
+    survey.images.map((img) => img.roofParts)
+  );
   const recommendations = report.recommendations as string[];
+  // Only areas that couldn't be assessed reach the customer (SPEC-013 D1).
+  const assessmentGaps = customerAssessmentGaps(storedReviewFlags(report.rawAiResponse));
   const roofContextLines = roofContextSummaryLines(survey.roofContext as RoofContext | null);
 
   // Generate presigned URLs for all survey images (valid 1 hour)
@@ -214,34 +215,14 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      {/* Defects */}
-      {defects && defects.length > 0 && (
-        <div className="bg-white border rounded-xl mb-6 overflow-hidden">
-          <div className="px-5 py-4 border-b">
-            <h2 className="font-semibold text-gray-900">Defects found ({defects.length})</h2>
-          </div>
-          <div className="divide-y">
-            {defects.map((d, i) => (
-              <div key={i} className="px-5 py-4 flex items-start gap-4">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full mt-0.5 ${SEVERITY_STYLES[d.severity] ?? SEVERITY_STYLES.low}`}>
-                  {d.severity}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900 capitalize">
-                      {d.type.replace(/_/g, " ")}
-                    </p>
-                    {imageUrls[d.image_index] && (
-                      <span className="text-xs text-gray-400">photo {d.image_index + 1}</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500 mt-0.5">{d.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Areas not assessed (BL-010), peripheral concerns (BL-004), other defects */}
+      <AssessmentGapsCard gaps={assessmentGaps} />
+      <DefectCard
+        title="Peripheral concerns"
+        intro="Edges and joins that are easy to miss: eaves, wall junctions, fascia, upstands, drainage points and fixtures."
+        defects={defects.peripheral}
+      />
+      <DefectCard title="Defects found" defects={defects.other} />
 
       {/* Recommendations */}
       {recommendations && recommendations.length > 0 && (

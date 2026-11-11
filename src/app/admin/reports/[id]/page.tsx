@@ -5,10 +5,19 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getPresignedReadUrl } from "@/lib/r2";
 import { isReportReleased } from "@/lib/reportRelease";
-import { ReportCorrectionSchema, type ReportCorrection } from "@/lib/reportCorrection";
+import { correctionValues, type ReportCorrection } from "@/lib/reportCorrection";
 import { ReviewForm } from "./review-form";
+import { customerDefectSections } from "@/lib/defectDisplay";
+import { REVIEW_FLAG_LABELS, customerAssessmentGaps, storedReviewFlags, type ReviewFlag } from "@/lib/reviewFlags";
+import { AssessmentGapsCard, DefectCard } from "@/components/reports/report-sections";
 
-type AiAnswer = { condition_score?: number; defects?: ReportCorrection["defects"]; recommendations?: string[]; surveyor_notes?: string };
+type AiAnswer = {
+  condition_score?: number;
+  ai_condition_score?: number;
+  defects?: ReportCorrection["defects"];
+  recommendations?: string[];
+  surveyor_notes?: string;
+};
 
 const STATUS_LABEL = {
   draft: { label: "Held — customer cannot see it", colour: "bg-amber-100 text-amber-700" },
@@ -16,30 +25,26 @@ const STATUS_LABEL = {
   overridden: { label: "Released with your corrections", colour: "bg-blue-100 text-blue-700" },
 } as const;
 
-// The current report as the form will edit it. A stored value that no longer
-// fits the correction rules falls back to an empty list rather than crashing.
-function currentValues(report: { conditionScore: number; defectsJson: unknown; recommendations: unknown; adminNotes: string | null }): ReportCorrection {
-  const defects = ReportCorrectionSchema.shape.defects.safeParse(report.defectsJson);
-  const recommendations = ReportCorrectionSchema.shape.recommendations.safeParse(report.recommendations);
-  return {
-    conditionScore: report.conditionScore,
-    defects: defects.success ? defects.data : [],
-    recommendations: recommendations.success ? recommendations.data : [],
-    adminNotes: report.adminNotes,
-  };
-}
-
 function AiOriginal({ ai }: { ai: AiAnswer }) {
   return (
     <details className="bg-white border rounded-xl px-5 py-4 mb-6">
       <summary className="font-semibold text-gray-900 cursor-pointer">The AI&apos;s original answer</summary>
       <div className="mt-4 space-y-3 text-sm text-gray-700">
-        <p><span className="font-medium">Score:</span> {ai.condition_score ?? "—"}/10</p>
+        <p>
+          <span className="font-medium">Score:</span> {ai.condition_score ?? "—"}/10
+          {ai.ai_condition_score !== undefined && (
+            <span className="text-amber-700"> (capped by the safety rule; the AI gave {ai.ai_condition_score}/10)</span>
+          )}
+        </p>
         <div>
           <p className="font-medium">Defects</p>
           <ul className="list-disc pl-5">
             {(ai.defects ?? []).map((d, i) => (
-              <li key={i}>[{d.severity}] {d.type.replace(/_/g, " ")} — {d.description} (photo {d.image_index + 1})</li>
+              <li key={i}>
+                [{d.priority ?? "no priority"} · severity {d.severity} · {d.category ?? "—"} · {d.extent ?? "—"} · zone {d.zone ?? "—"}]{" "}
+                {d.type.replace(/_/g, " ")} — {d.description} (photo {d.image_index + 1}
+                {d.location ? `: ${d.location}` : ""})
+              </li>
             ))}
           </ul>
         </div>
@@ -55,20 +60,45 @@ function AiOriginal({ ai }: { ai: AiAnswer }) {
   );
 }
 
-const SEVERITY_STYLES: Record<string, string> = {
-  critical: "bg-red-100 text-red-700",
-  high: "bg-orange-100 text-orange-700",
-  medium: "bg-blue-100 text-blue-700",
-  low: "bg-gray-100 text-gray-600",
-};
+// BL-010: everything the AI flagged for a human look, with its reason.
+function ReviewFlags({ flags }: { flags: ReviewFlag[] }) {
+  if (flags.length === 0) return null;
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-6">
+      <h2 className="font-semibold text-amber-900">Needs a closer look ({flags.length})</h2>
+      <ul className="mt-2 space-y-1 text-sm text-amber-900">
+        {flags.map((f, i) => (
+          <li key={i}>
+            <span className="font-medium">{REVIEW_FLAG_LABELS[f.reason]}:</span> {f.description}
+            {f.image_index !== null && <span className="text-amber-700"> (photo {f.image_index + 1})</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-amber-700 mt-2">The customer sees only areas not assessed and areas too dark to judge.</p>
+    </div>
+  );
+}
 
 type Preview = {
   values: ReportCorrection;
+  flags: ReviewFlag[];
+  photoRoofParts: string[][];
   remainingLife: number | null;
   confidence: string;
   surveyorNotes?: string;
   pdfUrl: string | null;
 };
+
+function PreviewDefects({ preview }: { preview: Preview }) {
+  const sections = customerDefectSections(preview.values.defects, preview.photoRoofParts);
+  return (
+    <div>
+      <AssessmentGapsCard gaps={customerAssessmentGaps(preview.flags)} />
+      <DefectCard title="Peripheral concerns" defects={sections.peripheral} />
+      <DefectCard title="Defects found" defects={sections.other} />
+    </div>
+  );
+}
 
 // The report exactly as the customer will see it once released: the saved
 // (corrected) values, not the AI's original.
@@ -83,17 +113,7 @@ function CustomerPreview({ preview }: { preview: Preview }) {
         <p className="text-gray-600 capitalize">AI confidence: {preview.confidence}</p>
       </div>
       {preview.surveyorNotes && <p className="text-sm text-blue-800 bg-blue-50 rounded-lg px-3 py-2">{preview.surveyorNotes}</p>}
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">Defects found ({values.defects.length})</p>
-        <ul className="space-y-2">
-          {values.defects.map((d, i) => (
-            <li key={i} className="flex items-start gap-3 text-sm">
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${SEVERITY_STYLES[d.severity]}`}>{d.severity}</span>
-              <span className="text-gray-800"><span className="capitalize font-medium">{d.type.replace(/_/g, " ")}</span> — {d.description} <span className="text-gray-400">(photo {d.image_index + 1})</span></span>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <PreviewDefects preview={preview} />
       <div>
         <p className="text-sm font-medium text-gray-700 mb-2">Recommendations</p>
         <ol className="list-decimal pl-5 text-sm text-gray-800 space-y-1">
@@ -135,7 +155,8 @@ export default async function ReviewReportPage({ params }: { params: Promise<{ i
   ]);
   const status = STATUS_LABEL[report.status];
   const ai = (report.rawAiResponse ?? {}) as AiAnswer;
-  const values = currentValues(report);
+  const values = correctionValues(report);
+  const flags = storedReviewFlags(report.rawAiResponse);
 
   return (
     <div className="p-4 md:p-8 max-w-4xl">
@@ -173,9 +194,13 @@ export default async function ReviewReportPage({ params }: { params: Promise<{ i
         </div>
       )}
 
+      <ReviewFlags flags={flags} />
+
       <CustomerPreview
         preview={{
           values,
+          flags,
+          photoRoofParts: survey.images.map((img) => img.roofParts),
           remainingLife: report.estimatedRemainingLife,
           confidence: report.confidence,
           surveyorNotes: ai.surveyor_notes,

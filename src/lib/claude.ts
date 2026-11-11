@@ -2,6 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { buildRoofContextPromptBlock, type RoofContext } from "@/lib/roofContext";
 import { buildPhotoLabelsBlock, type RoofPart } from "@/lib/photoTag";
+import { applyScoreCaps, rubricPromptSection } from "@/lib/scoringRubric";
+import { ReviewFlagSchema, reviewFlagPromptSection, withLowConfidenceFlag, type ReviewFlag } from "@/lib/reviewFlags";
+import { DEFECT_ZONES, peripheralPromptSection } from "@/lib/peripheralZones";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -15,6 +18,14 @@ const DefectSchema = z.object({
   severity: z.enum(["low", "medium", "high", "critical"]),
   description: z.string().max(150),
   image_index: z.number().int().min(0),
+  // BL-009: how soon to act, whether it affects how the roof works, how much of
+  // the roof it covers, and where in the photo it is (never a measured slope, ADR-008).
+  priority: z.enum(["low", "medium", "high", "urgent"]),
+  category: z.enum(["cosmetic", "functional"]),
+  extent: z.enum(["small", "moderate", "large"]),
+  location: z.string().max(120),
+  // BL-004: the peripheral zone the defect is in, or "none".
+  zone: z.enum(DEFECT_ZONES),
 });
 
 export const RoofAnalysisSchema = z.object({
@@ -25,9 +36,30 @@ export const RoofAnalysisSchema = z.object({
   urgent_action_required: z.boolean(),
   confidence: z.enum(["low", "medium", "high"]),
   surveyor_notes: z.string(),
+  // BL-010: what needs a human look (may be empty).
+  review_flags: z.array(ReviewFlagSchema),
 });
 
 export type RoofAnalysis = z.infer<typeof RoofAnalysisSchema>;
+
+export type Defect = z.infer<typeof DefectSchema>;
+
+/**
+ * A defect as stored on a report. Reports made before BL-009 have no
+ * priority, category, extent or location, so those are optional here.
+ */
+export type StoredDefect = Omit<Defect, "priority" | "category" | "extent" | "location" | "zone"> &
+  Partial<Pick<Defect, "priority" | "category" | "extent" | "location" | "zone">>;
+
+/** An analysis as rendered into a report or PDF: its defects may be stored ones. */
+export type ReportAnalysis = Omit<RoofAnalysis, "defects" | "review_flags"> & {
+  defects: StoredDefect[];
+  /** Absent on reports made before BL-010. */
+  review_flags?: ReviewFlag[];
+};
+
+/** A validated analysis after the safety caps; `ai_condition_score` is the AI's own score when a cap lowered it. */
+export type CappedRoofAnalysis = RoofAnalysis & { ai_condition_score?: number };
 
 // ── The prompt ─────────────────────────────────────────────────────────────────
 // We ask Claude to return ONLY valid JSON — no markdown fences, no prose.
@@ -66,22 +98,37 @@ Return ONLY valid JSON matching this exact schema — no markdown, no prose, no 
     "type": "<missing_tiles|cracked_tiles|moss_growth|flashing_damage|gutter_damage|ridge_damage|valley_damage|other>",
     "severity": "<low|medium|high|critical>",
     "description": "<max 150 chars describing location and extent>",
-    "image_index": <0-based index of the image showing this defect>
+    "image_index": <0-based index of the image showing this defect>,
+    "priority": "<low|medium|high|urgent — how soon to act, per the rubric below>",
+    "category": "<cosmetic|functional — per the rubric below>",
+    "extent": "<small|moderate|large — how much of the visible roof it affects>",
+    "location": "<max 120 chars: where in that image the defect is, e.g. lower left, near the gutter>",
+    "zone": "<eaves|wall_junction|fascia|upstand|drainage_point|protrusion|none — per the peripheral zones below>"
   }],
   "estimated_remaining_life_years": <integer or null if unable to estimate>,
   "recommendations": ["<specific action item>"],
   "urgent_action_required": <true if score <= 3 or any critical defect>,
   "confidence": "<low|medium|high — based on image quality and coverage>",
-  "surveyor_notes": "<overall summary, max 1000 chars>"
+  "surveyor_notes": "<overall summary, max 1000 chars>",
+  "review_flags": [{
+    "reason": "<low_confidence|ambiguous|unassessable_area|low_light — per the review flags below>",
+    "description": "<max 150 chars: what and where, from the photo>",
+    "image_index": <0-based index of the photo it concerns, or null>
+  }]
 }
 
-Scoring guide:
-  1–3 = Replace soon (structural risk)
-  4–6 = Repair needed (significant defects)
-  7–9 = Maintenance recommended (minor issues)
-  10  = Excellent condition
+${rubricPromptSection()}
 
-List defects from most to least severe.
+${peripheralPromptSection()}
+
+${reviewFlagPromptSection()}
+
+Location: say where in the image the defect is (for example "lower left, near the gutter", "right of the
+chimney"). Never state a slope as measured or name a compass direction you cannot see; if the image has a customer
+label in <photo_labels>, you may refer to it only as the customer's label (for example "the photo labelled front
+slope").
+
+List defects from most to least urgent.
 If image quality prevents proper assessment, set confidence to "low" and note why.`;
 
 // ── Main export ────────────────────────────────────────────────────────────────
@@ -93,7 +140,7 @@ export async function analyzeRoof(
   customerNotes?: string,
   roofContext?: RoofContext | null,
   photoLabels?: readonly (readonly RoofPart[])[] | null
-): Promise<RoofAnalysis> {
+): Promise<CappedRoofAnalysis> {
   // Build the content array — one image block per photo
   // Claude Vision accepts up to 20 images per request
   const imageBlocks: Anthropic.ImageBlockParam[] = base64Images.map((data, i) => ({
@@ -120,7 +167,8 @@ export async function analyzeRoof(
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-5",
-    max_tokens: 2048,
+    // Room for the flags and zones (SPEC-013); the model itself is BL-067's.
+    max_tokens: 4096,
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -159,5 +207,7 @@ export async function analyzeRoof(
     throw new Error(`Claude response failed validation: ${JSON.stringify(result.error.flatten())}`);
   }
 
-  return result.data;
+  // Safety caps (SPEC-010): a serious functional defect limits the score; the AI's own score is kept.
+  // Low confidence always shows as a review flag (SPEC-013 A3).
+  return withLowConfidenceFlag(applyScoreCaps(result.data));
 }

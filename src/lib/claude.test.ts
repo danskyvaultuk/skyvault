@@ -19,6 +19,11 @@ const VALID_RESPONSE_JSON = {
       severity: "low",
       description: "Light moss on north-facing slope",
       image_index: 0,
+      priority: "low",
+      category: "cosmetic",
+      extent: "moderate",
+      location: "upper half of the photo, across the tiles",
+      zone: "none",
     },
   ],
   estimated_remaining_life_years: 15,
@@ -26,6 +31,7 @@ const VALID_RESPONSE_JSON = {
   urgent_action_required: false,
   confidence: "high",
   surveyor_notes: "Overall in good condition.",
+  review_flags: [],
 };
 
 function mockClaudeReturns(json: object) {
@@ -146,6 +152,109 @@ describe("analyzeRoof — photo labels (BL-021)", () => {
     const { system } = await promptFor([["front"], [], []]);
     expect(system).toContain("<photo_labels>");
     expect(system).toContain("customer-supplied");
+    expect(system).toContain('"condition_score": <integer 1–10, where 10 = perfect new roof>');
+  });
+});
+
+describe("analyzeRoof — defect priority, location and the rubric (BL-003 / BL-009)", () => {
+  const withDefect = (defect: Record<string, unknown>, score = 8) => ({
+    ...VALID_RESPONSE_JSON,
+    condition_score: score,
+    defects: [defect],
+  });
+  const FUNCTIONAL = {
+    type: "flashing_damage",
+    severity: "high",
+    description: "Lifted lead flashing at the chimney",
+    image_index: 1,
+    priority: "urgent",
+    category: "functional",
+    extent: "small",
+    location: "right of the chimney, at the base",
+    zone: "protrusion",
+  };
+
+  it("parses a defect carrying priority, category, extent and location", async () => {
+    mockClaudeReturns(withDefect({ ...FUNCTIONAL, priority: "medium" }, 6));
+    const result = await analyzeRoof(["a", "b"], ["image/jpeg", "image/jpeg"]);
+    expect(result.defects[0]).toMatchObject({ priority: "medium", category: "functional", extent: "small" });
+  });
+
+  it.each(["priority", "category", "extent", "location", "zone"])("refuses a defect missing %s", async (field) => {
+    const defect: Record<string, unknown> = { ...FUNCTIONAL };
+    delete defect[field];
+    mockClaudeReturns(withDefect(defect));
+    await expect(analyzeRoof(["a", "b"], ["image/jpeg", "image/jpeg"])).rejects.toThrow();
+  });
+
+  it("returns the score capped, keeping the AI's own score", async () => {
+    mockClaudeReturns(withDefect(FUNCTIONAL, 8));
+    const result = await analyzeRoof(["a", "b"], ["image/jpeg", "image/jpeg"]);
+    expect(result.condition_score).toBe(3);
+    expect(result.ai_condition_score).toBe(8);
+  });
+
+  it("carries the rubric, the new fields and the location rule in the system prompt", async () => {
+    mockClaudeReturns(VALID_RESPONSE_JSON);
+    await analyzeRoof(["a"], ["image/jpeg"]);
+    const system = mockCreate.mock.calls[0][0].system as string;
+    for (let score = 1; score <= 10; score++) expect(system).toMatch(new RegExp(`\\n  ${score} = `));
+    expect(system).toContain('"priority": "<low|medium|high|urgent');
+    expect(system).toContain('"category": "<cosmetic|functional');
+    expect(system).toContain('"extent": "<small|moderate|large');
+    expect(system).toContain('"location":');
+    expect(system).toMatch(/never state a slope as measured/i);
+    expect(system).toMatch(/Functional defects lower the score far\s+more than cosmetic ones/);
+    expect(system).toContain('"description": "<max 150 chars describing location and extent>"');
+    expect(system).toContain('"image_index": <0-based index of the image showing this defect>');
+    expect(system).toContain('"type": "<missing_tiles|cracked_tiles|moss_growth|flashing_damage|gutter_damage|ridge_damage|valley_damage|other>"');
+  });
+});
+
+describe("analyzeRoof — review flags and peripheral zones (BL-010 / BL-004)", () => {
+  const SHADOW = { reason: "low_light", description: "Rear slope photo, upper half in shadow", image_index: 0 };
+
+  it("parses an answer with review flags and a zoned defect", async () => {
+    mockClaudeReturns({
+      ...VALID_RESPONSE_JSON,
+      defects: [{ ...VALID_RESPONSE_JSON.defects[0], type: "gutter_damage", zone: "drainage_point" }],
+      review_flags: [SHADOW],
+    });
+    const result = await analyzeRoof(["a"], ["image/jpeg"]);
+    expect(result.review_flags).toEqual([SHADOW]);
+    expect(result.defects[0].zone).toBe("drainage_point");
+  });
+
+  it("refuses an answer missing the review flag list", async () => {
+    const { review_flags: _omitted, ...withoutFlags } = VALID_RESPONSE_JSON;
+    mockClaudeReturns(withoutFlags);
+    await expect(analyzeRoof(["a"], ["image/jpeg"])).rejects.toThrow(/failed validation/);
+  });
+
+  it("refuses an unknown zone", async () => {
+    mockClaudeReturns({ ...VALID_RESPONSE_JSON, defects: [{ ...VALID_RESPONSE_JSON.defects[0], zone: "attic" }] });
+    await expect(analyzeRoof(["a"], ["image/jpeg"])).rejects.toThrow(/failed validation/);
+  });
+
+  it("adds a low_confidence flag to a low-confidence answer that raised none", async () => {
+    mockClaudeReturns({ ...VALID_RESPONSE_JSON, confidence: "low", review_flags: [SHADOW] });
+    const result = await analyzeRoof(["a"], ["image/jpeg"]);
+    expect(result.review_flags.map((f) => f.reason)).toEqual(["low_light", "low_confidence"]);
+  });
+
+  it("names every peripheral zone and carries the flag and lighting guidance in the system prompt", async () => {
+    mockClaudeReturns(VALID_RESPONSE_JSON);
+    await analyzeRoof(["a"], ["image/jpeg"]);
+    const system = mockCreate.mock.calls[0][0].system as string;
+    for (const zone of ["eaves", "wall_junction", "fascia", "upstand", "drainage_point", "protrusion"]) {
+      expect(system).toContain(`"${zone}"`);
+    }
+    for (const reason of ["low_confidence", "ambiguous", "unassessable_area", "low_light"]) {
+      expect(system).toContain(`"${reason}"`);
+    }
+    expect(system).toContain('"review_flags": [{');
+    expect(system).toContain('"zone": "<eaves|wall_junction|fascia|upstand|drainage_point|protrusion|none');
+    expect(system).toMatch(/Shadow is not felt or a flat roof/);
     expect(system).toContain('"condition_score": <integer 1–10, where 10 = perfect new roof>');
   });
 });

@@ -1,7 +1,9 @@
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from "@react-pdf/renderer";
 import React from "react";
-import type { RoofAnalysis } from "./claude";
+import type { ReportAnalysis } from "./claude";
 import { roofContextSummaryLines, type RoofContext } from "./roofContext";
+import { customerDefectSections, type CustomerDefect } from "./defectDisplay";
+import { customerAssessmentGaps, type AssessmentGap } from "./reviewFlags";
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
@@ -42,7 +44,9 @@ const styles = StyleSheet.create({
   },
   defectSeverity: { width: 60, fontSize: 9, fontFamily: "Helvetica-Bold" },
   defectType: { width: 100, fontSize: 9 },
-  defectDesc: { flex: 1, fontSize: 9, color: "#4b5563" },
+  // No flex here: inside the column beside the type, flex would squash the
+  // description to nothing and the location line would print over it.
+  defectDesc: { fontSize: 9, color: "#4b5563" },
   recommendationItem: { marginBottom: 4, flexDirection: "row" },
   bullet: { width: 12, fontSize: 10 },
   urgentBanner: {
@@ -66,14 +70,59 @@ const styles = StyleSheet.create({
   footerText: { fontSize: 8, color: "#9ca3af" },
 });
 
-// ── Severity colour ────────────────────────────────────────────────────────────
-function severityColour(s: string): string {
-  switch (s) {
+// ── Priority colour (BL-009; "critical" only on reports from before priorities) ─
+function priorityColour(key: string): string {
+  switch (key) {
+    case "urgent":
     case "critical": return "#b91c1c";
     case "high":     return "#d97706";
     case "medium":   return "#2563eb";
     default:         return "#6b7280";
   }
+}
+
+// ── Defect section (BL-009; peripheral zones BL-004) ──────────────────────────
+function DefectSection({ title, defects }: { title: string; defects: CustomerDefect[] }) {
+  if (defects.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>
+        {title} ({defects.length})
+      </Text>
+      {defects.map((d, i) => (
+        <View key={i} style={styles.defectRow}>
+          <Text style={[styles.defectSeverity, { color: priorityColour(d.key) }]}>{d.label.toUpperCase()}</Text>
+          <Text style={styles.defectType}>{d.zoneText ? `${d.typeText} · ${d.zoneText}` : d.typeText}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.defectDesc}>{d.description}</Text>
+            <Text style={{ fontSize: 8, color: "#6b7280", marginTop: 2 }}>{d.locationText}</Text>
+            {d.categoryText && <Text style={{ fontSize: 8, color: "#9ca3af" }}>{d.categoryText}</Text>}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ── Areas we couldn't assess (BL-010 / SPEC-013 D1) ───────────────────────────
+function AssessmentGapsSection({ gaps }: { gaps: AssessmentGap[] }) {
+  if (gaps.length === 0) return null;
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{"Areas we couldn't assess"}</Text>
+      <Text style={{ fontSize: 9, color: "#6b7280", marginBottom: 4 }}>
+        {"Our survey couldn't judge these from the photos. A roofer may want to look at them in person."}
+      </Text>
+      {gaps.map((g, i) => (
+        <View key={i} style={styles.recommendationItem}>
+          <Text style={styles.bullet}>•</Text>
+          <Text style={{ flex: 1, fontSize: 10, color: "#374151" }}>
+            {g.photoText ? `${g.description} (${g.photoText})` : g.description}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 // ── Score label ────────────────────────────────────────────────────────────────
@@ -93,15 +142,19 @@ function ReportDocument({
   imageBase64s,
   customerNotes,
   roofContext,
+  photoRoofParts,
 }: {
-  analysis: RoofAnalysis;
+  analysis: ReportAnalysis;
   address: string;
   postcode: string;
   generatedAt: string;
   imageBase64s?: string[];
   customerNotes?: string | null;
   roofContext?: RoofContext | null;
+  photoRoofParts?: readonly (readonly string[])[];
 }) {
+  const defects = customerDefectSections(analysis.defects, photoRoofParts ?? []);
+  const assessmentGaps = customerAssessmentGaps(analysis.review_flags ?? []);
   const roofContextLines = roofContextSummaryLines(roofContext);
   const hasCustomerInfo = !!customerNotes || roofContextLines.length > 0;
   return (
@@ -178,25 +231,10 @@ function ReportDocument({
           </View>
         )}
 
-        {/* Defects */}
-        {analysis.defects.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Defects found ({analysis.defects.length})
-            </Text>
-            {analysis.defects.map((d, i) => (
-              <View key={i} style={styles.defectRow}>
-                <Text style={[styles.defectSeverity, { color: severityColour(d.severity) }]}>
-                  {d.severity.toUpperCase()}
-                </Text>
-                <Text style={styles.defectType}>
-                  {d.type.replace(/_/g, " ")}
-                </Text>
-                <Text style={styles.defectDesc}>{d.description}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        {/* Areas not assessed, peripheral concerns, other defects */}
+        <AssessmentGapsSection gaps={assessmentGaps} />
+        <DefectSection title="Peripheral concerns" defects={defects.peripheral} />
+        <DefectSection title="Defects found" defects={defects.other} />
 
         {/* Recommendations */}
         {analysis.recommendations.length > 0 && (
@@ -259,19 +297,20 @@ function ReportDocument({
 
 // ── Export ─────────────────────────────────────────────────────────────────────
 export async function renderReportPDF(
-  analysis: RoofAnalysis,
+  analysis: ReportAnalysis,
   address: string,
   postcode: string,
   imageBase64s?: string[],
   customerNotes?: string | null,
-  roofContext?: RoofContext | null
+  roofContext?: RoofContext | null,
+  photoRoofParts?: readonly (readonly string[])[]
 ): Promise<Buffer> {
   const generatedAt = new Date().toLocaleDateString("en-GB", {
     day: "numeric", month: "long", year: "numeric",
   });
 
   const element = React.createElement(ReportDocument, {
-    analysis, address, postcode, generatedAt, imageBase64s, customerNotes, roofContext,
+    analysis, address, postcode, generatedAt, imageBase64s, customerNotes, roofContext, photoRoofParts,
   }) as unknown as React.ReactElement<import("@react-pdf/renderer").DocumentProps>;
 
   const buffer = await renderToBuffer(element);
