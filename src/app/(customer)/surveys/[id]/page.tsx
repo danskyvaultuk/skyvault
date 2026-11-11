@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { PhotoChecklist } from "@/components/surveys/photo-checklist";
 import { checklistStatus, missingLabels, type ChecklistId } from "@/lib/photoChecklist";
 import { RoofContextCard, type RoofContext } from "@/components/surveys/roof-context-card";
@@ -48,7 +48,6 @@ const STATUS_LABELS: Record<string, Record<string, { label: string; colour: stri
 
 export default function SurveyPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const justBooked = searchParams.get("booked") === "1";
 
@@ -128,7 +127,10 @@ export default function SurveyPage() {
       fetchSurvey();
       return;
     }
-    router.push(`/surveys/${id}/report`);
+    // Background analysis (BL-023): stay here; the page now shows the
+    // "being prepared" message and the customer is emailed when it's released.
+    setAnalysing(false);
+    fetchSurvey();
   }
 
   if (!survey) {
@@ -233,7 +235,7 @@ export default function SurveyPage() {
                 disabled={analysing}
                 className="w-full bg-blue-700 text-white rounded-lg py-3 text-sm font-medium hover:bg-blue-800 disabled:opacity-50"
               >
-                {analysing ? "Sending to AI — this takes about 30 seconds…" : "Generate my roof report →"}
+                {analysing ? "Starting your report…" : "Generate my roof report →"}
               </button>
             </div>
           )}
@@ -336,7 +338,7 @@ export default function SurveyPage() {
               className="w-full bg-blue-700 text-white rounded-lg py-3 text-sm font-medium hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {analysing
-                ? "Sending to AI — this takes about 30 seconds…"
+                ? "Starting your report…"
                 : canAnalyse
                 ? "Analyse roof with AI →"
                 : "Upload an image to continue"}
@@ -357,9 +359,10 @@ export default function SurveyPage() {
       {/* ── SHARED ─────────────────────────────────────────────────────── */}
       {survey.status === "analysing" && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4">
-          <p className="text-blue-700 font-semibold text-sm">Analysing your roof…</p>
+          <p className="text-blue-700 font-semibold text-sm">We&apos;re preparing your report</p>
           <p className="text-blue-600 text-sm mt-1">
-            This usually takes about 30 seconds. You can leave this page and come back.
+            Our AI is analysing your photos, and our team checks every report before it&apos;s released.
+            We&apos;ll email you as soon as yours is ready. You can close this page.
           </p>
         </div>
       )}
