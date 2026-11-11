@@ -1,6 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { blogPosts } from "@/data/blogPosts";
+import { journeys } from "@/lib/journeys";
+import { visibleBlogPosts } from "@/content/blogVisibility";
 
 export const metadata = {
   title: "Blog — SkyVault",
@@ -9,6 +11,8 @@ export const metadata = {
 };
 
 export default function BlogIndexPage() {
+  // Posts about a switched-off journey are hidden (BL-059).
+  const posts = visibleBlogPosts(blogPosts, journeys);
   return (
     <main className="flex flex-col min-h-screen">
       {/* Nav */}
@@ -47,8 +51,11 @@ export default function BlogIndexPage() {
 
       {/* Post grid */}
       <section className="flex-1 px-6 py-12 max-w-5xl mx-auto w-full">
+        {posts.length === 0 && (
+          <p className="text-center text-gray-500">New articles are on their way. Please check back soon.</p>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {blogPosts.map((post) => (
+          {posts.map((post) => (
             <Link
               key={post.slug}
               href={`/blog/${post.slug}`}

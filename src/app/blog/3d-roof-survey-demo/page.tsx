@@ -3,6 +3,7 @@ import Image from "next/image";
 import { blogPosts } from "@/data/blogPosts";
 import { notFound } from "next/navigation";
 import ModelViewerWrapper from "@/components/ModelViewerWrapper";
+import { journeys } from "@/lib/journeys";
 
 export const metadata = {
   title: "Inside a SkyVault Pro Survey — Interactive 3D Roof Model",
@@ -12,7 +13,8 @@ export const metadata = {
 
 export default function BlogPost3DDemo() {
   const post = blogPosts.find((p) => p.slug === "3d-roof-survey-demo");
-  if (!post) notFound();
+  // A drone post is hidden while the drone journey is off (BL-059).
+  if (!post || !journeys.droneEnabled) notFound();
 
   return (
     <main className="flex flex-col min-h-screen bg-white">
