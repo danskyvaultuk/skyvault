@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { runAnalysisPipeline } from "@/lib/pipeline";
+import { reportError } from "@/lib/monitoring";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -47,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   waitUntil(
     runAnalysisPipeline(surveyId).then(
       () => undefined,
-      (err) => console.error(`[analyse] Analysis failed for survey ${surveyId}:`, err)
+      (err) => reportError(err, { what: "analysis-failed", surveyId })
     )
   );
   return NextResponse.json({ status: "analysing" }, { status: 202 });

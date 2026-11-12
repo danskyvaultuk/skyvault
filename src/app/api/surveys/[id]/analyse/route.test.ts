@@ -17,6 +17,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/pipeline", () => ({ runAnalysisPipeline: (...args: unknown[]) => mockRunPipeline(...args) }));
 vi.mock("@vercel/functions", () => ({ waitUntil: (p: Promise<unknown>) => mockWaitUntil(p) }));
+const mockReportError = vi.fn();
+vi.mock("@/lib/monitoring", () => ({ reportError: (...args: unknown[]) => mockReportError(...args) }));
 
 const { POST } = await import("./route");
 
@@ -67,14 +69,13 @@ describe("POST /api/surveys/[id]/analyse — background analysis (BL-023)", () =
     expect(mockSurveyUpdate).not.toHaveBeenCalled();
   });
 
-  it("logs a failure in the background", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    mockRunPipeline.mockRejectedValue(new Error("Claude declined to analyse these photos (refusal)"));
+  it("reports a failure in the background, with the survey id (SPEC-020 B2)", async () => {
+    const failure = new Error("Claude declined to analyse these photos (refusal)");
+    mockRunPipeline.mockRejectedValue(failure);
 
     await post(OWNER, survey());
     await mockWaitUntil.mock.calls[0][0];
 
-    expect(error).toHaveBeenCalledWith(expect.stringContaining("survey-1"), expect.any(Error));
-    error.mockRestore();
+    expect(mockReportError).toHaveBeenCalledWith(failure, { what: "analysis-failed", surveyId: "survey-1" });
   });
 });

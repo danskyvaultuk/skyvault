@@ -9,6 +9,7 @@ import { isReportReleased } from "@/lib/reportRelease";
 import { ReportCorrectionSchema, type ReportCorrection } from "@/lib/reportCorrection";
 import type { PreparedPhoto, SurveyPhoto } from "@/lib/surveyImages";
 import { storedReviewFlags } from "@/lib/reviewFlags";
+import { reportError } from "@/lib/monitoring";
 
 export type ReviewReport = {
   id: string;
@@ -166,7 +167,7 @@ export class ReportReview {
     try {
       return await this.deps.readPdf(report.pdfS3Key);
     } catch (err) {
-      console.error(`[review] Could not read the PDF for report ${report.id}; emailing the link alone`, err);
+      reportError(err, { what: "report-pdf-unreadable", reportId: report.id, note: "emailing the link alone" });
       return null;
     }
   }

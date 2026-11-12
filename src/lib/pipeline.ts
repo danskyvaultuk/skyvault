@@ -8,6 +8,7 @@ import { RoofContextSchema } from "@/lib/roofContext";
 import { fetchSurveyPhotos } from "@/lib/surveyImages";
 import { analysisModel } from "@/lib/analysisModel";
 import type { AnalysisMeta } from "@/lib/analysisTiming";
+import { reportError } from "@/lib/monitoring";
 
 /** The model and times of one analysis, logged and kept with the AI's answer for the admin (SPEC-015 C). */
 function recordTiming(surveyId: string, aiMs: number, startedAt: number): AnalysisMeta {
@@ -125,7 +126,7 @@ export async function runAnalysisPipeline(surveyId: string) {
       try {
         await distributeLeads(surveyId, report.id, survey.property.postcode);
       } catch (err) {
-        console.error("[pipeline] Lead distribution failed:", err);
+        reportError(err, { what: "lead-distribution-failed", surveyId });
       }
     }
 
@@ -138,7 +139,7 @@ export async function runAnalysisPipeline(surveyId: string) {
 
   } catch (err) {
     // ── On any error: mark as failed ──────────────────────────────────────
-    console.error("[pipeline] Pipeline failed:", err);
+    reportError(err, { what: "pipeline-failed", surveyId });
 
     await prisma.survey.update({
       where: { id: surveyId },

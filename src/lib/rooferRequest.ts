@@ -4,6 +4,7 @@
 // admin marks it handled (`closed`). Its createdAt is the time of consent.
 import type { LeadStatus, ReportStatus } from "@prisma/client";
 import { isReportReleased } from "@/lib/reportRelease";
+import { reportError } from "@/lib/monitoring";
 
 export const DEFAULT_ADMIN_EMAIL = "dan@skyvaultuk.com";
 
@@ -83,7 +84,7 @@ export class RooferRequests {
         surveyId: survey.id,
       });
     } catch (err) {
-      console.error("[roofer-request] Admin email failed:", err);
+      reportError(err, { what: "roofer-request-email-failed", surveyId: survey.id });
     }
   }
 }

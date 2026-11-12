@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { appBaseUrlWithSource } from "@/lib/appUrl";
 import { authBaseUrl } from "@/lib/authUrl";
 import { siteAddressReport, type AddressLine } from "@/lib/siteAddressCheck";
+import { SentryTestButton } from "./sentry-test-button";
 
 // BL-069: the addresses email links and login use, so a stale setting is seen
 // here first. Only addresses and setting names are shown, never a secret.
@@ -104,6 +105,7 @@ export default async function AdminDashboard() {
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
 
       <SiteAddresses lines={addressLines} />
+      <SentryTestButton />
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-10">
