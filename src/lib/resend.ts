@@ -1,4 +1,5 @@
 import { appBaseUrl } from "@/lib/appUrl";
+import { reportError } from "@/lib/monitoring";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "noreply@skyvaultuk.com";
@@ -12,14 +13,18 @@ function appLink(path: string): string {
   return `${APP_URL}${path}`;
 }
 
+type EmailAttachment = { filename: string; content: Buffer };
+
 async function sendEmail({
   to,
   subject,
   html,
+  attachments,
 }: {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }) {
   if (!RESEND_API_KEY) {
     // Log in dev so we can see what would be sent without a real key
@@ -33,12 +38,23 @@ async function sendEmail({
       Authorization: `Bearer ${RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: FROM_EMAIL, to, subject, html }),
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      html,
+      // Resend takes each attachment's content as Base64.
+      ...(attachments?.length
+        ? { attachments: attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }
+        : {}),
+    }),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    console.error(`[resend] Failed to send email to ${to}:`, body);
+    // The provider's reply can quote the recipient, so it stays in the server log;
+    // Sentry gets the subject and status only, never an address (SPEC-020 B3).
+    console.error(`[resend] Provider reply for "${subject}":`, await res.text());
+    reportError(new Error(`Email failed to send (status ${res.status})`), { what: "email-failed", subject });
   }
 }
 
@@ -70,16 +86,38 @@ export async function notifyRooferNewLead({
   });
 }
 
+// BL-022: the largest PDF attached to the report ready email. Resend allows
+// 40 MB per email after Base64 encoding, which grows a file by a third; 20 MB
+// raw stays well inside that. A larger PDF is left off and the link carries the report.
+export const MAX_REPORT_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
+function reportAttachment(pdf: Buffer | null, postcode: string, surveyId: string): EmailAttachment | null {
+  if (!pdf) return null;
+  if (pdf.length > MAX_REPORT_ATTACHMENT_BYTES) {
+    console.warn(
+      `[resend] Report PDF for survey ${surveyId} is ${pdf.length} bytes, over the ${MAX_REPORT_ATTACHMENT_BYTES}-byte limit; sending the link alone`
+    );
+    return null;
+  }
+  return { filename: `SkyVault-roof-report-${postcode.replace(/\s+/g, "")}.pdf`, content: pdf };
+}
+
 export async function notifyCustomerReportReady({
   customerEmail,
   customerName,
   surveyId,
+  postcode,
+  pdf,
 }: {
   customerEmail: string;
   customerName: string;
   surveyId: string;
+  postcode: string;
+  /** The stored report PDF, attached when present and within the limit (BL-022). */
+  pdf: Buffer | null;
 }) {
   const reportUrl = appLink(`/surveys/${surveyId}/report`);
+  const attachment = reportAttachment(pdf, postcode, surveyId);
 
   await sendEmail({
     to: customerEmail,
@@ -87,9 +125,11 @@ export async function notifyCustomerReportReady({
     html: `
       <p>Hi ${customerName ?? "there"},</p>
       <p>Your roof survey has been analysed by our AI and your report is ready to view.</p>
+      ${attachment ? "<p>Your report is also attached to this email as a PDF.</p>" : ""}
       <p><a href="${reportUrl}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">View your report →</a></p>
       <p style="color:#6b7280;font-size:12px;">SkyVault — AI-powered roof surveys</p>
     `,
+    ...(attachment ? { attachments: [attachment] } : {}),
   });
 }
 

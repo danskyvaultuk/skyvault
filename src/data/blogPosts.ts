@@ -6,6 +6,8 @@ export interface BlogPost {
   tags: string[];
   featuredImage: string;
   modelUrl: string;
+  /** A post about a journey that can be switched off (BL-058) is hidden while it is off (BL-059). */
+  journey?: "drone";
 }
 
 // TODO: swap modelUrl to CloudFront CDN URL (cdn.skyvaultuk.com) when CloudFront is set up
@@ -22,5 +24,6 @@ export const blogPosts: BlogPost[] = [
     tags: ["Pro Survey", "Technology"],
     featuredImage: "/images/blog/roof-survey-demo-orthophoto.jpg",
     modelUrl: `${PUBLIC_ASSETS_BASE}/blog/models/roof-survey-demo/model.glb`,
+    journey: "drone",
   },
 ];

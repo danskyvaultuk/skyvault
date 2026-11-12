@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { SITE_DESCRIPTION, SITE_TITLE } from "@/content/homeContent";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "SkyVault — AI Roof Survey & Lead Platform",
-  description:
-    "Get a professional roof assessment in minutes and connect with qualified roofers.",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
 };
 
 export default function RootLayout({

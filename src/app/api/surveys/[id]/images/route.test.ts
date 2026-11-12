@@ -112,7 +112,7 @@ describe("POST /api/surveys/[id]/images — photo quality (BL-018)", () => {
     expect(res.status).toBe(201);
     expect(mockImageCreate.mock.calls[0][0].data.validationStatus).toBe("pending");
     expect(mockAssess).not.toHaveBeenCalled();
-    expect(error.mock.calls.map((c) => String(c[0])).join("\n")).toContain("[photo-quality] could not read");
+    expect(error.mock.calls.map((c) => String(c[0])).join("\n")).toContain("[photo-check-unreadable]");
     error.mockRestore();
   });
 

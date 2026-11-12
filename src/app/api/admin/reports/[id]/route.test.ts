@@ -19,6 +19,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/r2", () => ({
   generatePdfKey: (surveyId: string) => `surveys/${surveyId}/report.pdf`,
   uploadBuffer: (...args: unknown[]) => mockUpload(...args),
+  downloadBuffer: vi.fn(),
 }));
 vi.mock("@/lib/pdf", () => ({ renderReportPDF: (...args: unknown[]) => mockRender(...args) }));
 vi.mock("@/lib/resend", () => ({ notifyCustomerReportReady: (...args: unknown[]) => mockNotify(...args) }));

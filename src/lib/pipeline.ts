@@ -6,6 +6,20 @@ import { distributeLeads } from "@/lib/leads";
 import { journeys } from "@/lib/journeys";
 import { RoofContextSchema } from "@/lib/roofContext";
 import { fetchSurveyPhotos } from "@/lib/surveyImages";
+import { analysisModel } from "@/lib/analysisModel";
+import type { AnalysisMeta } from "@/lib/analysisTiming";
+import { reportError } from "@/lib/monitoring";
+
+/** The model and times of one analysis, logged and kept with the AI's answer for the admin (SPEC-015 C). */
+function recordTiming(surveyId: string, aiMs: number, startedAt: number): AnalysisMeta {
+  const meta: AnalysisMeta = {
+    model: analysisModel({ SKYVAULT_ANALYSIS_MODEL: process.env.SKYVAULT_ANALYSIS_MODEL }),
+    ai_ms: aiMs,
+    total_ms: Date.now() - startedAt,
+  };
+  console.log(`[pipeline] timing survey=${surveyId} model=${meta.model} ai_ms=${meta.ai_ms} total_ms=${meta.total_ms}`);
+  return meta;
+}
 
 /**
  * Runs the full AI analysis pipeline for a survey.
@@ -20,6 +34,8 @@ import { fetchSurveyPhotos } from "@/lib/surveyImages";
  * Returns the created Report record.
  */
 export async function runAnalysisPipeline(surveyId: string) {
+  // Timing (BL-023): the whole run to the saved report, and the AI call within it.
+  const startedAt = Date.now();
   // ── Step 1: Load survey ────────────────────────────────────────────────────
   const survey = await prisma.survey.findUnique({
     where: { id: surveyId },
@@ -53,6 +69,7 @@ export async function runAnalysisPipeline(surveyId: string) {
       ? RoofContextSchema.parse(survey.roofContext)
       : null;
 
+    const aiStartedAt = Date.now();
     const analysis = await analyzeRoof(
       imageData.map((d) => d.base64),
       imageData.map((d) => d.mimeType),
@@ -61,6 +78,7 @@ export async function runAnalysisPipeline(surveyId: string) {
       // Which part of the roof each photo shows, in photo order (BL-021).
       survey.images.map((img) => img.roofParts)
     );
+    const aiMs = Date.now() - aiStartedAt;
     console.log(`[pipeline] Got score: ${analysis.condition_score}/10`);
 
     // ── Step 5: Generate PDF report ────────────────────────────────────────
@@ -81,6 +99,7 @@ export async function runAnalysisPipeline(surveyId: string) {
     console.log(`[pipeline] PDF uploaded: ${pdfKey}`);
 
     // ── Step 7: Save Report record ─────────────────────────────────────────
+    const analysisMeta = recordTiming(surveyId, aiMs, startedAt);
     const report = await prisma.report.create({
       data: {
         surveyId,
@@ -89,7 +108,7 @@ export async function runAnalysisPipeline(surveyId: string) {
         estimatedRemainingLife: analysis.estimated_remaining_life_years,
         recommendations: analysis.recommendations,
         confidence: analysis.confidence,
-        rawAiResponse: analysis as object,
+        rawAiResponse: { ...analysis, analysis_meta: analysisMeta },
         pdfS3Key: pdfKey,
         // Held until an admin approves it (BL-061).
         status: "draft",
@@ -107,7 +126,7 @@ export async function runAnalysisPipeline(surveyId: string) {
       try {
         await distributeLeads(surveyId, report.id, survey.property.postcode);
       } catch (err) {
-        console.error("[pipeline] Lead distribution failed:", err);
+        reportError(err, { what: "lead-distribution-failed", surveyId });
       }
     }
 
@@ -120,7 +139,7 @@ export async function runAnalysisPipeline(surveyId: string) {
 
   } catch (err) {
     // ── On any error: mark as failed ──────────────────────────────────────
-    console.error("[pipeline] Pipeline failed:", err);
+    reportError(err, { what: "pipeline-failed", surveyId });
 
     await prisma.survey.update({
       where: { id: surveyId },

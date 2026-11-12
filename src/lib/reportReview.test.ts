@@ -49,6 +49,8 @@ const CORRECTION = {
   adminNotes: "AI missed the flashing",
 };
 
+const STORED_PDF = Buffer.from("%PDF stored report");
+
 let deps: { [K in keyof ReportReviewDeps]: ReturnType<typeof vi.fn> };
 let review: ReportReview;
 
@@ -65,6 +67,7 @@ beforeEach(() => {
     storePdf: vi.fn(async () => undefined),
     pdfKeyFor: vi.fn((surveyId: string) => `surveys/${surveyId}/report.pdf`),
     notifyCustomer: vi.fn(async () => undefined),
+    readPdf: vi.fn(async () => STORED_PDF),
   };
   review = new ReportReview(deps as unknown as ReportReviewDeps);
 });
@@ -147,6 +150,8 @@ describe("ReportReview.approve", () => {
       customerEmail: "jane@example.com",
       customerName: "Jane",
       surveyId: "survey-1",
+      postcode: "SW1A 1AA",
+      pdf: STORED_PDF,
     });
   });
 
@@ -198,6 +203,8 @@ describe("ReportReview.resendEmail", () => {
       customerEmail: "jane@example.com",
       customerName: "Jane",
       surveyId: "survey-1",
+      postcode: "SW1A 1AA",
+      pdf: STORED_PDF,
     });
     expect(deps.updateReport).not.toHaveBeenCalled();
   });
@@ -349,5 +356,44 @@ describe("correctionValues — defects with and without a zone", () => {
     expect(values.defects).toHaveLength(2);
     expect(values.defects[0].zone).toBeUndefined();
     expect(values.defects[1].zone).toBe("drainage_point");
+  });
+});
+
+describe("the report ready email carries the stored PDF (BL-022)", () => {
+  it("approval reads the stored PDF and passes it to the email", async () => {
+    useReport(makeReport("draft"));
+    await review.approve("report-1");
+    expect(deps.readPdf).toHaveBeenCalledWith("surveys/survey-1/report.pdf");
+    expect(deps.notifyCustomer.mock.calls[0][0]).toMatchObject({ pdf: STORED_PDF, postcode: "SW1A 1AA" });
+  });
+
+  it("re-send reads the stored PDF and passes it to the email", async () => {
+    useReport(makeReport("published"));
+    await review.resendEmail("report-1");
+    expect(deps.readPdf).toHaveBeenCalledWith("surveys/survey-1/report.pdf");
+    expect(deps.notifyCustomer.mock.calls[0][0]).toMatchObject({ pdf: STORED_PDF });
+  });
+
+  it("still approves and emails, without a PDF, when the report has no stored PDF", async () => {
+    const log = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    useReport(makeReport("draft", { pdfS3Key: null }));
+
+    expect(await review.approve("report-1")).toEqual({ ok: true, status: "published" });
+    expect(deps.readPdf).not.toHaveBeenCalled();
+    expect(deps.notifyCustomer.mock.calls[0][0]).toMatchObject({ pdf: null });
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it("still approves and emails, without a PDF, when reading it fails", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    useReport(makeReport("draft"));
+    deps.readPdf.mockRejectedValueOnce(new Error("storage down"));
+
+    expect(await review.approve("report-1")).toEqual({ ok: true, status: "published" });
+    expect(deps.updateReport).toHaveBeenCalledWith("report-1", { status: "published" });
+    expect(deps.notifyCustomer.mock.calls[0][0]).toMatchObject({ pdf: null });
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
   });
 });

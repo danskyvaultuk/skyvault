@@ -43,6 +43,13 @@ export async function getPresignedReadUrl(
   return getSignedUrl(r2, command, { expiresIn: expiresInSeconds });
 }
 
+/** Reads a stored object into memory, e.g. a report PDF to attach to an email (BL-022). */
+export async function downloadBuffer(key: string): Promise<Buffer> {
+  const result = await r2.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  if (!result.Body) throw new Error(`Stored object is empty: ${key}`);
+  return Buffer.from(await result.Body.transformToByteArray());
+}
+
 export async function uploadBuffer(key: string, body: Buffer, contentType: string): Promise<void> {
   await r2.send(
     new PutObjectCommand({

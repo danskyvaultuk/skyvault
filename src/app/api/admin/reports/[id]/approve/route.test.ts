@@ -14,7 +14,12 @@ vi.mock("@/lib/prisma", () => ({
     },
   },
 }));
-vi.mock("@/lib/r2", () => ({ generatePdfKey: vi.fn(), uploadBuffer: vi.fn() }));
+const STORED_PDF = Buffer.from("%PDF stored");
+vi.mock("@/lib/r2", () => ({
+  generatePdfKey: vi.fn(),
+  uploadBuffer: vi.fn(),
+  downloadBuffer: vi.fn(async () => STORED_PDF),
+}));
 vi.mock("@/lib/pdf", () => ({ renderReportPDF: vi.fn() }));
 vi.mock("@/lib/resend", () => ({ notifyCustomerReportReady: (...args: unknown[]) => mockNotify(...args) }));
 vi.mock("@/lib/surveyImages", () => ({ fetchSurveyPhotos: vi.fn() }));
@@ -77,6 +82,8 @@ describe("POST /api/admin/reports/[id]/approve", () => {
     expect(await res.json()).toEqual({ status: "published" });
     expect(mockUpdate).toHaveBeenCalledWith({ where: { id: "report-1" }, data: { status: "published" } });
     expect(mockNotify).toHaveBeenCalledTimes(1);
+    // BL-022: the stored PDF goes with the email.
+    expect(mockNotify.mock.calls[0][0]).toMatchObject({ pdf: STORED_PDF, postcode: "SW1A 1AA" });
   });
 
   it("refuses an already released report with 409 and sends no email", async () => {

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { runAnalysisPipeline } from "@/lib/pipeline";
 import { analysisLimitReached } from "@/lib/analysisLimit";
+import { reportError } from "@/lib/monitoring";
 
 type SurveyToAnalyse = {
   customerId: string;
@@ -63,13 +65,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Survey is already being analysed" }, { status: 400 });
   }
 
-  try {
-    const report = await runAnalysisPipeline(surveyId);
-    return NextResponse.json({ reportId: report.id });
-  } catch {
-    await prisma.survey
-      .updateMany({ where: { id: surveyId, status: "analysing" }, data: { status: "failed" } })
-      .catch(() => {});
-    return NextResponse.json({ error: "Analysis failed. Please try again." }, { status: 500 });
-  }
+  // Background analysis (BL-023): every report waits for the admin anyway
+  // (BL-061), so the customer is answered at once. waitUntil keeps the
+  // function alive until the pipeline finishes. The pipeline marks the survey
+  // "failed" only for errors inside its own try, so an earlier throw would leave
+  // it stuck in "analysing" (BL-071): the handler puts it back to "failed" here,
+  // so the customer can retry, and reports the failure.
+  waitUntil(
+    runAnalysisPipeline(surveyId).then(
+      () => undefined,
+      async (err) => {
+        reportError(err, { what: "analysis-failed", surveyId });
+        await prisma.survey
+          .updateMany({ where: { id: surveyId, status: "analysing" }, data: { status: "failed" } })
+          .catch(() => {});
+      }
+    )
+  );
+  return NextResponse.json({ status: "analysing" }, { status: 202 });
 }

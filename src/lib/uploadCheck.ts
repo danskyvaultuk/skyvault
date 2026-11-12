@@ -5,6 +5,7 @@
 import type { ImageValidationStatus } from "@prisma/client";
 import { getPresignedReadUrl } from "@/lib/r2";
 import { assessPhotoQuality, photoQualityLimits, PHOTO_GUIDANCE, type RejectionReason } from "@/lib/photoQuality";
+import { reportError } from "@/lib/monitoring";
 
 export type UploadCheck =
   | { kind: "rejected"; reason: RejectionReason; guidance: string }
@@ -16,7 +17,7 @@ async function readStoredFile(s3Key: string): Promise<Buffer | null> {
     if (!response.ok) throw new Error(`storage answered ${response.status}`);
     return Buffer.from(await response.arrayBuffer());
   } catch (err) {
-    console.error(`[photo-quality] could not read ${s3Key} to check it; saving unchecked:`, err);
+    reportError(err, { what: "photo-check-unreadable", s3Key, note: "saved unchecked" });
     return null;
   }
 }

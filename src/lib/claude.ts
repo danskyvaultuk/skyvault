@@ -5,6 +5,7 @@ import { buildPhotoLabelsBlock, type RoofPart } from "@/lib/photoTag";
 import { applyScoreCaps, rubricPromptSection } from "@/lib/scoringRubric";
 import { ReviewFlagSchema, reviewFlagPromptSection, withLowConfidenceFlag, type ReviewFlag } from "@/lib/reviewFlags";
 import { DEFECT_ZONES, peripheralPromptSection } from "@/lib/peripheralZones";
+import { analysisModel, analysisRequestOptions } from "@/lib/analysisModel";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -131,6 +132,18 @@ slope").
 List defects from most to least urgent.
 If image quality prevents proper assessment, set confidence to "low" and note why.`;
 
+// ── The answer's text ─────────────────────────────────────────────────────────
+// Current models think before answering; only the text blocks are the answer.
+// A declined or cut-short response is refused by name (SPEC-015 A3).
+function answerText(response: Anthropic.Message): string {
+  if (response.stop_reason === "refusal") throw new Error("Claude declined to analyse these photos (refusal)");
+  if (response.stop_reason === "max_tokens") throw new Error("Claude's answer was cut short (max_tokens)");
+  return response.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+}
+
 // ── Main export ────────────────────────────────────────────────────────────────
 // base64Images: array of base64-encoded image strings (no data: prefix needed)
 // mimeTypes: matching array of MIME types e.g. "image/jpeg"
@@ -165,10 +178,11 @@ export async function analyzeRoof(
     promptText += `\n\n<photo_labels>\n${photoLabelsBlock}\n</photo_labels>`;
   }
 
+  // The model is a setting (BL-067), Opus 5.5 by default, with the request shaped for it.
+  const model = analysisModel({ SKYVAULT_ANALYSIS_MODEL: process.env.SKYVAULT_ANALYSIS_MODEL });
   const response = await client.messages.create({
-    model: "claude-sonnet-4-5",
-    // Room for the flags and zones (SPEC-013); the model itself is BL-067's.
-    max_tokens: 4096,
+    model,
+    ...analysisRequestOptions(model),
     system: SYSTEM_PROMPT,
     messages: [
       {
@@ -184,11 +198,7 @@ export async function analyzeRoof(
     ],
   });
 
-  // Extract the text content from Claude's response
-  const text = response.content
-    .filter((block) => block.type === "text")
-    .map((block) => (block as Anthropic.TextBlock).text)
-    .join("");
+  const text = answerText(response);
 
   // Strip markdown code fences if Claude ignored the "no markdown" instruction
   // e.g. ```json { ... } ``` → { ... }

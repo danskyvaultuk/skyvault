@@ -6,6 +6,8 @@ const mockSurveyFindUnique = vi.fn();
 const mockSurveyCount = vi.fn();
 const mockSurveyUpdateMany = vi.fn();
 const mockPipeline = vi.fn();
+const mockWaitUntil = vi.fn();
+const mockReportError = vi.fn();
 
 vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 vi.mock("@/lib/prisma", () => ({
@@ -18,6 +20,8 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 vi.mock("@/lib/pipeline", () => ({ runAnalysisPipeline: (...args: unknown[]) => mockPipeline(...args) }));
+vi.mock("@vercel/functions", () => ({ waitUntil: (p: Promise<unknown>) => mockWaitUntil(p) }));
+vi.mock("@/lib/monitoring", () => ({ reportError: (...args: unknown[]) => mockReportError(...args) }));
 
 const { POST } = await import("./route");
 
@@ -25,6 +29,11 @@ function analyse() {
   return POST(new Request("http://localhost/api/surveys/survey-1/analyse", { method: "POST" }), {
     params: Promise.resolve({ id: "survey-1" }),
   });
+}
+
+// The background work handed to waitUntil, so a test can wait for it to settle.
+function background(): Promise<unknown> {
+  return mockWaitUntil.mock.calls[0][0];
 }
 
 function survey(over: Record<string, unknown> = {}) {
@@ -37,6 +46,8 @@ beforeEach(() => {
   mockSurveyCount.mockReset().mockResolvedValue(0);
   mockSurveyUpdateMany.mockReset().mockResolvedValue({ count: 1 });
   mockPipeline.mockReset().mockResolvedValue({ id: "report-1" });
+  mockWaitUntil.mockReset();
+  mockReportError.mockReset();
 });
 
 describe("POST /api/surveys/[id]/analyse", () => {
@@ -60,21 +71,34 @@ describe("POST /api/surveys/[id]/analyse", () => {
     expect(mockSurveyCount.mock.calls[0][0].where.customerId).not.toBe("admin-1");
   });
 
-  it("one below the limit: counts, then claims, then runs the pipeline once", async () => {
+  it("one below the limit: counts, then claims, then starts the pipeline once in the background", async () => {
     mockSurveyCount.mockResolvedValue(ANALYSIS_LIMIT - 1);
     const res = await analyse();
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     expect(mockSurveyUpdateMany).toHaveBeenCalledWith({
       where: { id: "survey-1", status: { in: ["draft", "pending"] } },
       data: { status: "analysing" },
     });
+    expect(mockSurveyUpdateMany).toHaveBeenCalledTimes(1);
     expect(mockPipeline).toHaveBeenCalledTimes(1);
     expect(mockPipeline).toHaveBeenCalledWith("survey-1");
+    expect(mockWaitUntil).toHaveBeenCalledTimes(1);
     const count = mockSurveyCount.mock.invocationCallOrder[0];
     const claim = mockSurveyUpdateMany.mock.invocationCallOrder[0];
     const run = mockPipeline.mock.invocationCallOrder[0];
     expect(count).toBeLessThan(claim);
     expect(claim).toBeLessThan(run);
+  });
+
+  it("answers 202 at once, without waiting for the pipeline (BL-023)", async () => {
+    let finish: () => void = () => {};
+    mockPipeline.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
+    const res = await analyse();
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ status: "analysing" });
+    finish();
+    await background();
+    expect(mockReportError).not.toHaveBeenCalled();
   });
 
   it("a claim that changes no row: 400, pipeline not called", async () => {
@@ -91,55 +115,42 @@ describe("POST /api/surveys/[id]/analyse", () => {
     expect(mockPipeline).not.toHaveBeenCalled();
   });
 
-  it("another customer's survey: 403", async () => {
-    mockSurveyFindUnique.mockResolvedValue(survey({ customerId: "cust-2" }));
+  it.each([
+    ["no session", { auth: null }, 401],
+    ["another customer's survey", { found: survey({ customerId: "cust-2" }) }, 403],
+    ["a missing survey", { found: null }, 404],
+    ["a survey in a status past pending", { found: survey({ status: "complete" }) }, 400],
+    ["a survey already analysing", { found: survey({ status: "analysing" }) }, 400],
+    ["a survey with no images", { found: survey({ images: [] }) }, 400],
+  ])("starts nothing for %s", async (_label, setup: { auth?: null; found?: unknown }, status) => {
+    if ("auth" in setup) mockAuth.mockResolvedValue(setup.auth);
+    if ("found" in setup) mockSurveyFindUnique.mockResolvedValue(setup.found);
     const res = await analyse();
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(status);
     expect(mockPipeline).not.toHaveBeenCalled();
+    expect(mockSurveyUpdateMany).not.toHaveBeenCalled();
+    expect(mockWaitUntil).not.toHaveBeenCalled();
   });
 
-  it("no session: 401", async () => {
-    mockAuth.mockResolvedValue(null);
+  it("a pipeline failure in the background: reports it with the survey id and reverts analysing to failed (SPEC-020 B2, BL-071)", async () => {
+    const failure = new Error("Survey has no images to analyse");
+    mockPipeline.mockRejectedValue(failure);
     const res = await analyse();
-    expect(res.status).toBe(401);
-    expect(mockPipeline).not.toHaveBeenCalled();
-  });
-
-  it("missing survey: 404", async () => {
-    mockSurveyFindUnique.mockResolvedValue(null);
-    const res = await analyse();
-    expect(res.status).toBe(404);
-    expect(mockPipeline).not.toHaveBeenCalled();
-  });
-
-  it("a survey in a status past pending: 400", async () => {
-    mockSurveyFindUnique.mockResolvedValue(survey({ status: "complete" }));
-    const res = await analyse();
-    expect(res.status).toBe(400);
-    expect(mockPipeline).not.toHaveBeenCalled();
-  });
-
-  it("a survey with no images: 400", async () => {
-    mockSurveyFindUnique.mockResolvedValue(survey({ images: [] }));
-    const res = await analyse();
-    expect(res.status).toBe(400);
-    expect(mockPipeline).not.toHaveBeenCalled();
-  });
-
-  it("a pipeline throw after the claim: reverts analysing to failed, then 500", async () => {
-    mockPipeline.mockRejectedValue(new Error("model unavailable"));
-    const res = await analyse();
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(202);
+    await background();
+    expect(mockReportError).toHaveBeenCalledWith(failure, { what: "analysis-failed", surveyId: "survey-1" });
     expect(mockSurveyUpdateMany).toHaveBeenLastCalledWith({
       where: { id: "survey-1", status: "analysing" },
       data: { status: "failed" },
     });
   });
 
-  it("the revert itself rejecting still answers 500", async () => {
+  it("the revert itself rejecting still settles the background work, and the failure is still reported", async () => {
     mockPipeline.mockRejectedValue(new Error("model unavailable"));
     mockSurveyUpdateMany.mockResolvedValueOnce({ count: 1 }).mockRejectedValueOnce(new Error("db unavailable"));
     const res = await analyse();
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(202);
+    await expect(background()).resolves.toBeUndefined();
+    expect(mockReportError).toHaveBeenCalledTimes(1);
   });
 });
