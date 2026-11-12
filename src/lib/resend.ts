@@ -1,4 +1,5 @@
 import { appBaseUrl } from "@/lib/appUrl";
+import { reportError } from "@/lib/monitoring";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "noreply@skyvaultuk.com";
@@ -50,8 +51,10 @@ async function sendEmail({
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    console.error(`[resend] Failed to send email to ${to}:`, body);
+    // The provider's reply can quote the recipient, so it stays in the server log;
+    // Sentry gets the subject and status only, never an address (SPEC-020 B3).
+    console.error(`[resend] Provider reply for "${subject}":`, await res.text());
+    reportError(new Error(`Email failed to send (status ${res.status})`), { what: "email-failed", subject });
   }
 }
 
