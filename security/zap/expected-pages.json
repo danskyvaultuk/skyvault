@@ -1,0 +1,178 @@
+{
+  "customer": [
+    {
+      "path": "/dashboard",
+      "status": 200
+    },
+    {
+      "path": "/properties",
+      "status": 200
+    },
+    {
+      "path": "/properties/new",
+      "status": 200
+    },
+    {
+      "path": "/properties/svzap-property-a",
+      "status": 200
+    },
+    {
+      "path": "/surveys",
+      "status": 200
+    },
+    {
+      "path": "/surveys/new",
+      "status": 200
+    },
+    {
+      "path": "/surveys/svzap-survey-s1",
+      "status": 200
+    },
+    {
+      "path": "/surveys/svzap-survey-s2/report",
+      "status": 200
+    },
+    {
+      "path": "/surveys/svzap-survey-s3/report",
+      "status": 200
+    },
+    {
+      "path": "/quotes",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/unavailable",
+      "status": 200
+    },
+    {
+      "path": "/auth/redirect",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/admin/dashboard",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/admin/reports",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/admin/reports/svzap-report-s2",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/admin/reports/svzap-report-s3",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/admin/roofer-requests",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/admin/roofers",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/admin/surveys",
+      "status": 307,
+      "location": "/dashboard"
+    },
+    {
+      "path": "/admin/users",
+      "status": 307,
+      "location": "/dashboard"
+    }
+  ],
+  "admin": [
+    {
+      "path": "/admin/dashboard",
+      "status": 200
+    },
+    {
+      "path": "/admin/reports",
+      "status": 200
+    },
+    {
+      "path": "/admin/reports/svzap-report-s2",
+      "status": 200
+    },
+    {
+      "path": "/admin/reports/svzap-report-s3",
+      "status": 200
+    },
+    {
+      "path": "/admin/roofer-requests",
+      "status": 200
+    },
+    {
+      "path": "/admin/roofers",
+      "status": 200
+    },
+    {
+      "path": "/admin/surveys",
+      "status": 200
+    },
+    {
+      "path": "/admin/users",
+      "status": 200
+    },
+    {
+      "path": "/unavailable",
+      "status": 200
+    },
+    {
+      "path": "/auth/redirect",
+      "status": 307,
+      "location": "/admin/dashboard"
+    },
+    {
+      "path": "/dashboard",
+      "status": 200
+    },
+    {
+      "path": "/properties",
+      "status": 200
+    },
+    {
+      "path": "/properties/new",
+      "status": 200
+    },
+    {
+      "path": "/properties/svzap-property-a",
+      "status": 404
+    },
+    {
+      "path": "/surveys",
+      "status": 200
+    },
+    {
+      "path": "/surveys/new",
+      "status": 200
+    },
+    {
+      "path": "/surveys/svzap-survey-s1",
+      "status": 200
+    },
+    {
+      "path": "/surveys/svzap-survey-s2/report",
+      "status": 200
+    },
+    {
+      "path": "/surveys/svzap-survey-s3/report",
+      "status": 200
+    },
+    {
+      "path": "/quotes",
+      "status": 307,
+      "location": "/admin/dashboard"
+    }
+  ]
+}
