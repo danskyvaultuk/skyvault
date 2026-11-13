@@ -55,6 +55,12 @@ describe("POST /api/surveys/[id]/images — checklist labels (BL-021)", () => {
     expect(data.sortOrder).toBe(2);
   });
 
+  it("accepts a photo labelled secondary_roof and saves the label (BL-076 / SPEC-023 B2)", async () => {
+    const res = await register({ roofParts: ["secondary_roof"] });
+    expect(res.status).toBe(201);
+    expect(mockImageCreate.mock.calls[0][0].data.roofParts).toEqual(["secondary_roof"]);
+  });
+
   it("refuses an unknown roof part and saves nothing", async () => {
     const res = await register({ roofParts: ["front", "attic"] });
     expect(res.status).toBe(400);

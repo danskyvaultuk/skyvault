@@ -26,6 +26,14 @@ describe("customerDefects", () => {
     expect(shown.locationText).toBe("Seen in photo 3 (your front slope photo): lower left, near the gutter");
   });
 
+  it("names side and secondary_roof photos by their checklist items (BL-076 / SPEC-023 C2)", () => {
+    const photos = [["side"], ["secondary_roof"]] as const;
+    const at = (image_index: number) =>
+      customerDefects([{ ...base, image_index, priority: "low", category: "cosmetic", extent: "small", location: "edge" }], photos)[0].locationText;
+    expect(at(0)).toBe("Seen in photo 1 (your side slopes photo): edge");
+    expect(at(1)).toBe("Seen in photo 2 (your flat roofs, dormers, bays and porches photo): edge");
+  });
+
   it("uses the photo's own label when it is not a checklist shot, and none when unlabelled", () => {
     const at = (image_index: number) =>
       customerDefects([{ ...base, image_index, priority: "low", category: "cosmetic", extent: "small", location: "top edge" }], PHOTOS)[0].locationText;

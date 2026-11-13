@@ -9,7 +9,8 @@ import { z } from "zod";
 //   {
 //     "photoId": "string",
 //     "roofParts": ["front" | "back" | "side" | "chimney" | "close_up" |
-//                   "ridge" | "valley" | "gutter" | "flashing" | "overview", ...],
+//                   "ridge" | "valley" | "gutter" | "flashing" | "overview" |
+//                   "secondary_roof", ...],
 //     "aspect": "north" | "south" | "east" | "west" | null,
 //     "captureMethod": "string | null",
 //     "taggedAt": "ISO 8601 string | null"
@@ -25,10 +26,12 @@ import { z } from "zod";
 // a single photo faces one direction). ridge/valley/gutter/flashing/overview
 // deliberately mirror the defect "type" categories in claude.ts's
 // RoofAnalysisSchema, so a tagged photo lines up with the AI's own vocabulary.
+// secondary_roof (BL-076) marks a flat roof, dormer, bay window or porch roof:
+// a smaller roof that is not one of the main slopes.
 
 export const ROOF_PARTS = [
   "front", "back", "side", "chimney", "close_up",
-  "ridge", "valley", "gutter", "flashing", "overview",
+  "ridge", "valley", "gutter", "flashing", "overview", "secondary_roof",
 ] as const;
 export type RoofPart = (typeof ROOF_PARTS)[number];
 
@@ -65,6 +68,7 @@ export const ROOF_PART_LABELS: Record<RoofPart, string> = {
   gutter: "Gutter",
   flashing: "Flashing",
   overview: "Overview",
+  secondary_roof: "Flat roof, dormer, bay or porch",
 };
 
 export const ASPECT_LABELS: Record<Aspect, string> = {
