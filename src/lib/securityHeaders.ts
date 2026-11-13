@@ -12,6 +12,8 @@ export type SecurityHeader = { key: string; value: string };
  * - browser errors sent to Sentry's EU ingest;
  * - address and postcode lookup on the add-a-property page;
  * - Google sign-in, which the login form redirects to.
+ * The report PDF is downloaded through a plain link, which a CSP does not
+ * restrict, and no page embeds a frame or plugin, so none is allowed.
  */
 export function contentSecurityPolicy(env: { NODE_ENV?: string }): string {
   const scriptSrc = ["'self'", "'unsafe-inline'", ...(env.NODE_ENV === "production" ? [] : ["'unsafe-eval'"])];
