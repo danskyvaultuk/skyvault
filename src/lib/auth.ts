@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
+import { refreshSessionToken } from "@/lib/sessionRole";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -12,6 +13,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       Google({
         clientId: process.env.AUTH_GOOGLE_ID,
         clientSecret: process.env.AUTH_GOOGLE_SECRET,
+        // Kept on deliberately (BL-066 / SPEC-021 B3): Google hands over only
+        // addresses it has verified, and turning this off would lock a customer
+        // who first signed in by magic link out of the Google button.
         allowDangerousEmailAccountLinking: true,
       }),
     ] : []),
@@ -35,16 +39,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = (user as { role: Role }).role;
-      }
-      // OAuth providers don't pass custom fields — fetch role from DB if missing
-      if (!token.role && token.id) {
-        const dbUser = await prisma.user.findUnique({ where: { id: token.id as string } });
-        if (dbUser) token.role = dbUser.role;
-      }
-      return token;
+      // The role comes from the database on every check, so a role change or a
+      // deleted account takes effect at once (BL-066 / SPEC-021 B1).
+      return refreshSessionToken(token, user, (id) =>
+        prisma.user.findUnique({ where: { id }, select: { role: true } })
+      );
     },
     async session({ session, token }) {
       // Every request, copy from token into session so pages can read it

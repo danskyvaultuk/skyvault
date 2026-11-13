@@ -37,7 +37,15 @@ function background(): Promise<unknown> {
 }
 
 function survey(over: Record<string, unknown> = {}) {
-  return { id: "survey-1", customerId: "cust-1", status: "draft", images: [{ id: "img-1" }], report: null, ...over };
+  return {
+    id: "survey-1",
+    customerId: "cust-1",
+    status: "draft",
+    updatedAt: new Date(),
+    images: [{ id: "img-1" }],
+    report: null,
+    ...over,
+  };
 }
 
 beforeEach(() => {
@@ -76,7 +84,10 @@ describe("POST /api/surveys/[id]/analyse", () => {
     const res = await analyse();
     expect(res.status).toBe(202);
     expect(mockSurveyUpdateMany).toHaveBeenCalledWith({
-      where: { id: "survey-1", status: { in: ["draft", "pending"] } },
+      where: {
+        id: "survey-1",
+        OR: [{ status: { in: ["draft", "pending"] } }, { status: "analysing", updatedAt: { lt: expect.any(Date) } }],
+      },
       data: { status: "analysing" },
     });
     expect(mockSurveyUpdateMany).toHaveBeenCalledTimes(1);
@@ -152,5 +163,26 @@ describe("POST /api/surveys/[id]/analyse", () => {
     expect(res.status).toBe(202);
     await expect(background()).resolves.toBeUndefined();
     expect(mockReportError).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("POST /api/surveys/[id]/analyse — an analysis that stopped (BL-066 / SPEC-021 E2)", () => {
+  const MINUTE = 60 * 1000;
+
+  it("accepts a retry of a survey analysing for over 10 minutes", async () => {
+    mockSurveyFindUnique.mockResolvedValue(survey({ status: "analysing", updatedAt: new Date(Date.now() - 11 * MINUTE) }));
+    const res = await analyse();
+    expect(res.status).toBe(202);
+    expect(mockPipeline).toHaveBeenCalledWith("survey-1");
+    const cutoff = mockSurveyUpdateMany.mock.calls[0][0].where.OR[1].updatedAt.lt as Date;
+    expect(Math.abs(Date.now() - 10 * MINUTE - cutoff.getTime())).toBeLessThan(5000);
+  });
+
+  it("still refuses a survey analysing for under 10 minutes", async () => {
+    mockSurveyFindUnique.mockResolvedValue(survey({ status: "analysing", updatedAt: new Date(Date.now() - 9 * MINUTE) }));
+    const res = await analyse();
+    expect(res.status).toBe(400);
+    expect(mockSurveyUpdateMany).not.toHaveBeenCalled();
+    expect(mockPipeline).not.toHaveBeenCalled();
   });
 });

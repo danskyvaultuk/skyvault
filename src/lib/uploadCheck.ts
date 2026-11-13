@@ -4,7 +4,7 @@
 // customer: the photo is then saved unchecked (`pending`).
 import type { ImageValidationStatus } from "@prisma/client";
 import { getPresignedReadUrl } from "@/lib/r2";
-import { assessPhotoQuality, photoQualityLimits, PHOTO_GUIDANCE, type RejectionReason } from "@/lib/photoQuality";
+import { assessPhotoQuality, MAX_PHOTO_BYTES, photoQualityLimits, PHOTO_GUIDANCE, type RejectionReason } from "@/lib/photoQuality";
 import { reportError } from "@/lib/monitoring";
 
 export type UploadCheck =
@@ -25,6 +25,12 @@ async function readStoredFile(s3Key: string): Promise<Buffer | null> {
 export async function checkUploadedPhoto(surveyId: string, s3Key: string): Promise<UploadCheck> {
   const bytes = await readStoredFile(s3Key);
   if (!bytes) return { kind: "saved", validation: { validationStatus: "pending", validationNotes: null } };
+
+  // The size the browser declared is not trusted: the stored file is measured (BL-066 / SPEC-021 C1).
+  if (bytes.length > MAX_PHOTO_BYTES) {
+    console.warn("[photo-quality] rejected", JSON.stringify({ surveyId, s3Key, reason: "too-large", bytes: bytes.length }));
+    return { kind: "rejected", reason: "too-large", guidance: PHOTO_GUIDANCE["too-large"] };
+  }
 
   const limits = photoQualityLimits({
     SKYVAULT_PHOTO_MIN_SIDE: process.env.SKYVAULT_PHOTO_MIN_SIDE,

@@ -43,7 +43,11 @@ export default function NewSurveyPage() {
     });
 
     if (!res.ok) {
-      setError("Failed to create survey. Please try again.");
+      // The daily survey limit (BL-066) explains itself; anything else stays generic.
+      const body = await res.json().catch(() => ({}));
+      setError(
+        res.status === 429 && typeof body.error === "string" ? body.error : "Failed to create survey. Please try again."
+      );
       setLoading(false);
       return;
     }
@@ -138,6 +142,7 @@ export default function NewSurveyPage() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
+              maxLength={2000}
               placeholder="Any access instructions or areas of concern..."
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />

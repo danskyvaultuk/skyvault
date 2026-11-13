@@ -98,27 +98,30 @@ export async function runAnalysisPipeline(surveyId: string) {
     await uploadBuffer(pdfKey, pdfBuffer, "application/pdf");
     console.log(`[pipeline] PDF uploaded: ${pdfKey}`);
 
-    // ── Step 7: Save Report record ─────────────────────────────────────────
+    // ── Steps 7–8: Save the report and mark the survey complete, together ──
+    // One transaction (BL-066 / SPEC-021 E1): a survey can never end up
+    // "failed" with a report attached, which no retry could then clear.
     const analysisMeta = recordTiming(surveyId, aiMs, startedAt);
-    const report = await prisma.report.create({
-      data: {
-        surveyId,
-        conditionScore: analysis.condition_score,
-        defectsJson: analysis.defects,
-        estimatedRemainingLife: analysis.estimated_remaining_life_years,
-        recommendations: analysis.recommendations,
-        confidence: analysis.confidence,
-        rawAiResponse: { ...analysis, analysis_meta: analysisMeta },
-        pdfS3Key: pdfKey,
-        // Held until an admin approves it (BL-061).
-        status: "draft",
-      },
-    });
-
-    // ── Step 8: Mark survey complete ───────────────────────────────────────
-    await prisma.survey.update({
-      where: { id: surveyId },
-      data: { status: "complete" },
+    const report = await prisma.$transaction(async (tx) => {
+      const created = await tx.report.create({
+        data: {
+          surveyId,
+          conditionScore: analysis.condition_score,
+          defectsJson: analysis.defects,
+          estimatedRemainingLife: analysis.estimated_remaining_life_years,
+          recommendations: analysis.recommendations,
+          confidence: analysis.confidence,
+          rawAiResponse: { ...analysis, analysis_meta: analysisMeta },
+          pdfS3Key: pdfKey,
+          // Held until an admin approves it (BL-061).
+          status: "draft",
+        },
+      });
+      await tx.survey.update({
+        where: { id: surveyId },
+        data: { status: "complete" },
+      });
+      return created;
     });
 
     // ── Step 9: Distribute leads (only while the roofer journey is on, BL-058) ─

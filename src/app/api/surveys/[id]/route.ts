@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import type { SurveyStatus, Prisma } from "@prisma/client";
 import { RoofContextSchema, sanitizeRoofContext } from "@/lib/roofContext";
 import { getPresignedReadUrl } from "@/lib/r2";
+import { SurveyNotesSchema } from "@/lib/surveyNotes";
+import { isStaleAnalysis } from "@/lib/surveyState";
 import { reportForViewer } from "@/lib/reportRelease";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -45,6 +47,36 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return NextResponse.json({ ...survey, images, report });
 }
 
+type SurveyUpdate = { notes?: string; status?: SurveyStatus; roofContext?: Prisma.InputJsonValue };
+type SurveyForUpdate = { status: SurveyStatus; updatedAt: Date };
+type PatchBody = { notes?: unknown; status?: unknown; roofContext?: unknown };
+
+// The fields a customer's PATCH may change, or why the request is refused.
+function surveyUpdate(body: PatchBody, survey: SurveyForUpdate): { data: SurveyUpdate } | { error: unknown } {
+  const data: SurveyUpdate = {};
+  const isDraft = survey.status === "draft";
+
+  // Notes must be a string of at most 2,000 characters, whatever the status
+  // (BL-066 / SPEC-021 C4); they are saved only while the survey is a draft.
+  if (body.notes !== undefined) {
+    const notes = SurveyNotesSchema.safeParse(body.notes);
+    if (!notes.success) return { error: notes.error.flatten() };
+    if (isDraft) data.notes = notes.data;
+  }
+
+  // A failed survey, or a stale analysis (BL-066 / SPEC-021 E2), can be reset to draft for a retry.
+  if (body.status === "draft" && (survey.status === "failed" || isStaleAnalysis(survey))) data.status = "draft";
+
+  // Opt-in roof Q&A — same draft-only window as notes. Every field is optional;
+  // an empty object is valid (customer skipped everything).
+  if (body.roofContext !== undefined && isDraft) {
+    const parsed = RoofContextSchema.safeParse(body.roofContext);
+    if (!parsed.success) return { error: parsed.error.flatten() };
+    data.roofContext = sanitizeRoofContext(parsed.data);
+  }
+  return { data };
+}
+
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -57,22 +89,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await req.json();
-  // Allow resetting a failed survey back to draft for retry
-  const data: { notes?: string; status?: SurveyStatus; roofContext?: Prisma.InputJsonValue } = {};
-  // Allow updating notes freely while the survey is still in draft
-  if (body.notes !== undefined && survey.status === "draft") data.notes = body.notes;
-  if (body.status === "draft" && survey.status === "failed") data.status = "draft";
-
-  // Opt-in roof Q&A — same draft-only window as notes. Every field is optional;
-  // an empty object is valid (customer skipped everything).
-  if (body.roofContext !== undefined && survey.status === "draft") {
-    const parsed = RoofContextSchema.safeParse(body.roofContext);
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-    }
-    data.roofContext = sanitizeRoofContext(parsed.data);
-  }
+  const update = surveyUpdate(await req.json(), survey);
+  if ("error" in update) return NextResponse.json({ error: update.error }, { status: 400 });
+  const data = update.data;
 
   const updated = await prisma.survey.update({
     where: { id },

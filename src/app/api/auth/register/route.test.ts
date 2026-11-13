@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockFindUnique = vi.fn();
 const mockCreate = vi.fn();
+const mockUpdate = vi.fn();
 const switches = { droneEnabled: false, rooferEnabled: false };
 
 vi.mock("@/lib/prisma", () => ({
@@ -9,6 +10,8 @@ vi.mock("@/lib/prisma", () => ({
     user: {
       findUnique: (...args: unknown[]) => mockFindUnique(...args),
       create: (...args: unknown[]) => mockCreate(...args),
+      update: (...args: unknown[]) => mockUpdate(...args),
+      upsert: (...args: unknown[]) => mockUpdate(...args),
     },
   },
 }));
@@ -28,6 +31,7 @@ beforeEach(() => {
   switches.rooferEnabled = false;
   mockFindUnique.mockReset().mockResolvedValue(null);
   mockCreate.mockReset().mockResolvedValue({ id: "user-1" });
+  mockUpdate.mockReset();
 });
 
 describe("POST /api/auth/register with the drone and roofer journeys off", () => {
@@ -59,5 +63,21 @@ describe("POST /api/auth/register with a journey on", () => {
     switches.droneEnabled = true;
     const res = await POST(req("drone"));
     expect(res.status).toBe(200);
+  });
+});
+
+describe("POST /api/auth/register for an address that already has an account (BL-066)", () => {
+  it("answers exactly as for a new address, and leaves the account unchanged", async () => {
+    const fresh = await POST(req("customer"));
+    const freshBody = await fresh.json();
+
+    mockCreate.mockReset();
+    mockFindUnique.mockResolvedValue({ id: "user-9", email: "jane@example.com", name: "Old name", role: "admin" });
+    const existing = await POST(req("customer"));
+
+    expect(existing.status).toBe(fresh.status);
+    expect(await existing.json()).toEqual(freshBody);
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

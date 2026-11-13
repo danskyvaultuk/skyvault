@@ -1,3 +1,5 @@
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { RoleChanger } from "./role-changer";
 import { DeleteButton } from "./delete-button";
@@ -11,6 +13,10 @@ const ROLE_COLOURS: Record<string, string> = {
 };
 
 export default async function AdminUsersPage() {
+  // Each admin page checks the role itself (BL-066 / SPEC-021 B2).
+  const session = await auth();
+  if (!session || session.user.role !== "admin") redirect("/login");
+
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
     include: {

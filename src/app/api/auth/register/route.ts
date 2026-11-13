@@ -26,15 +26,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "This account type is not available at the moment." }, { status: 403 });
   }
 
-  // Check if account already exists
+  // An existing address gets the same answer as a new one, and its account is
+  // left as it is, so this route cannot be used to find out who has an account
+  // (BL-066 / SPEC-021 D1). Either way the page then sends a sign-in link.
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return NextResponse.json({ error: "An account with this email already exists. Please sign in." }, { status: 409 });
+  if (!existing) {
+    await prisma.user.create({
+      data: { email, name, role },
+    });
   }
-
-  await prisma.user.create({
-    data: { email, name, role },
-  });
 
   return NextResponse.json({ ok: true });
 }

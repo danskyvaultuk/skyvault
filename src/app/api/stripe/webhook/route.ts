@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import type Stripe from "stripe";
+import { journeys } from "@/lib/journeys";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,11 @@ async function upsertSubscription(sub: Stripe.Subscription) {
 }
 
 export async function POST(req: NextRequest) {
+  // Payments are off at launch (BL-066 / SPEC-021 Part F): nothing is processed
+  // while both paying journeys are off. The webhook's own fixes wait for them.
+  if (!journeys.droneEnabled && !journeys.rooferEnabled) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const rawBody = await req.text();
   const sig = req.headers.get("stripe-signature");
 

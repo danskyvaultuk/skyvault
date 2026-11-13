@@ -1,7 +1,13 @@
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { VerifyToggle } from "./verify-toggle";
 
 export default async function AdminRoofersPage() {
+  // Each admin page checks the role itself (BL-066 / SPEC-021 B2).
+  const session = await auth();
+  if (!session || session.user.role !== "admin") redirect("/login");
+
   const roofers = await prisma.user.findMany({
     where: { role: "roofer" },
     orderBy: { createdAt: "desc" },
