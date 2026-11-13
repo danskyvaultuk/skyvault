@@ -27,8 +27,6 @@ export function contentSecurityPolicy(env: { NODE_ENV?: string }): string {
       "'self'",
       "https://*.amazonaws.com",
       "https://*.ingest.de.sentry.io",
-      "https://nominatim.openstreetmap.org",
-      "https://api.postcodes.io",
     ],
     "worker-src": ["'self'", "blob:"],
     "frame-ancestors": ["'none'"],
