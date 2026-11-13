@@ -189,3 +189,36 @@ describe("GET /api/surveys/[id]/images — who may list a survey's photos", () =
     expect(await res.json()).toEqual(FIXTURE_IMAGES);
   });
 });
+
+describe("POST /api/surveys/[id]/images — server-enforced limits (BL-066)", () => {
+  const MB20 = 20 * 1024 * 1024;
+
+  it("refuses a stored file over 20 MB with 422 and saves nothing", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockFetch.mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(MB20 + 1) });
+    const res = await register({});
+    expect(res.status).toBe(422);
+    expect((await res.json()).reason).toBe("too-large");
+    expect(mockImageCreate).not.toHaveBeenCalled();
+    expect(mockAssess).not.toHaveBeenCalled();
+  });
+
+  it("accepts a stored file of exactly 20 MB", async () => {
+    mockFetch.mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(MB20) });
+    const res = await register({});
+    expect(res.status).toBe(201);
+  });
+
+  it("refuses an 11th photo and saves nothing", async () => {
+    mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", droneJob: null, _count: { images: 10 } });
+    const res = await register({});
+    expect(res.status).toBe(400);
+    expect(mockImageCreate).not.toHaveBeenCalled();
+  });
+
+  it("accepts the 10th photo", async () => {
+    mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", droneJob: null, _count: { images: 9 } });
+    const res = await register({});
+    expect(res.status).toBe(201);
+  });
+});

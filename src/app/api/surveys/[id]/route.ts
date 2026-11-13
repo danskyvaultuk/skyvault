@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { SurveyStatus, Prisma } from "@prisma/client";
 import { RoofContextSchema, sanitizeRoofContext } from "@/lib/roofContext";
 import { getPresignedReadUrl } from "@/lib/r2";
+import { SurveyNotesSchema } from "@/lib/surveyNotes";
 import { reportForViewer } from "@/lib/reportRelease";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -61,7 +62,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Allow resetting a failed survey back to draft for retry
   const data: { notes?: string; status?: SurveyStatus; roofContext?: Prisma.InputJsonValue } = {};
   // Allow updating notes freely while the survey is still in draft
-  if (body.notes !== undefined && survey.status === "draft") data.notes = body.notes;
+  if (body.notes !== undefined && survey.status === "draft") {
+    // A string of at most 2,000 characters (BL-066 / SPEC-021 C4).
+    const notes = SurveyNotesSchema.safeParse(body.notes);
+    if (!notes.success) return NextResponse.json({ error: notes.error.flatten() }, { status: 400 });
+    data.notes = notes.data;
+  }
   if (body.status === "draft" && survey.status === "failed") data.status = "draft";
 
   // Opt-in roof Q&A — same draft-only window as notes. Every field is optional;

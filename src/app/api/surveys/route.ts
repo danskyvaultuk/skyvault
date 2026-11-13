@@ -3,11 +3,13 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { journeys } from "@/lib/journeys";
+import { surveyCreationLimitReached } from "@/lib/surveyLimit";
+import { SurveyNotesSchema } from "@/lib/surveyNotes";
 
 const createSchema = z.object({
   propertyId: z.string().cuid(),
   type: z.enum(["self_upload", "drone_capture"]),
-  notes: z.string().optional(),
+  notes: SurveyNotesSchema.optional(),
 });
 
 export async function GET() {
@@ -49,6 +51,14 @@ export async function POST(req: Request) {
   const property = await prisma.property.findUnique({ where: { id: parsed.data.propertyId } });
   if (!property || property.ownerId !== session.user.id) {
     return NextResponse.json({ error: "Property not found" }, { status: 404 });
+  }
+
+  // At most 5 new surveys per customer per 24 hours (BL-066 / SPEC-021 C3).
+  if (await surveyCreationLimitReached(session.user.id)) {
+    return NextResponse.json(
+      { error: "You've started the most surveys allowed in one day. Please try again tomorrow." },
+      { status: 429 }
+    );
   }
 
   const survey = await prisma.survey.create({

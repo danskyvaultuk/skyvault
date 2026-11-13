@@ -4,7 +4,10 @@
 import sharp from "sharp";
 
 export type PhotoQualityLimits = { minSide: number; minSharpness: number };
-export type RejectionReason = "too-small" | "too-blurry" | "unreadable";
+export type RejectionReason = "too-small" | "too-blurry" | "unreadable" | "too-large";
+
+/** The largest photo the server accepts, checked on the stored file (BL-066 / SPEC-021 C1). */
+export const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
 
 type Measured = { width: number; height: number; sharpness: number };
 
@@ -19,6 +22,7 @@ export const PHOTO_GUIDANCE: Record<RejectionReason, string> = {
   "too-blurry":
     "This photo looks blurry. Hold the phone steady, tap the screen to focus on the roof, and take it again in good light.",
   unreadable: "We couldn't open this file as a photo. Please upload a JPEG, PNG or WebP photo.",
+  "too-large": "This photo is over 20 MB. Please upload the photo straight from your phone's camera, or a smaller copy of it.",
 };
 
 const DEFAULTS: PhotoQualityLimits = { minSide: 720, minSharpness: 8 };

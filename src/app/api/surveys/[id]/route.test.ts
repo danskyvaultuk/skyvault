@@ -2,16 +2,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockAuth = vi.fn();
 const mockSurveyFindUnique = vi.fn();
+const mockSurveyUpdate = vi.fn();
 
 vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { survey: { findUnique: (...args: unknown[]) => mockSurveyFindUnique(...args) } },
+  prisma: {
+    survey: {
+      findUnique: (...args: unknown[]) => mockSurveyFindUnique(...args),
+      update: (...args: unknown[]) => mockSurveyUpdate(...args),
+    },
+  },
 }));
 vi.mock("@/lib/r2", () => ({
   getPresignedReadUrl: vi.fn(async () => "https://example.com/signed"),
 }));
 
-const { GET } = await import("./route");
+const { GET, PATCH } = await import("./route");
 
 const OWNER = { user: { id: "cust-1", role: "customer" } };
 const ADMIN = { user: { id: "admin-1", role: "admin" } };
@@ -72,4 +78,33 @@ describe("GET /api/surveys/[id] — held reports (BL-061)", () => {
       expect(report).not.toHaveProperty("adminNotes");
     }
   );
+});
+
+describe("PATCH /api/surveys/[id] — notes (BL-066)", () => {
+  function patch(body: Record<string, unknown>) {
+    mockAuth.mockResolvedValue(OWNER);
+    mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", status: "draft" });
+    mockSurveyUpdate.mockReset().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: "survey-1", ...data }));
+    return PATCH(new Request("http://localhost/api/surveys/survey-1", { method: "PATCH", body: JSON.stringify(body) }), {
+      params: Promise.resolve({ id: "survey-1" }),
+    });
+  }
+
+  it("refuses notes over 2,000 characters and saves nothing", async () => {
+    const res = await patch({ notes: "x".repeat(2001) });
+    expect(res.status).toBe(400);
+    expect(mockSurveyUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuses notes that are not text", async () => {
+    const res = await patch({ notes: { text: "hi" } });
+    expect(res.status).toBe(400);
+    expect(mockSurveyUpdate).not.toHaveBeenCalled();
+  });
+
+  it("saves notes of exactly 2,000 characters", async () => {
+    const res = await patch({ notes: "x".repeat(2000) });
+    expect(res.status).toBe(200);
+    expect(mockSurveyUpdate.mock.calls[0][0].data.notes).toHaveLength(2000);
+  });
 });

@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { ROOF_PARTS, type RoofPart } from "@/lib/photoTag";
 import { checkUploadedPhoto } from "@/lib/uploadCheck";
 
+const MAX_IMAGES = 10;
+
 const registerSchema = z.object({
   s3Key: z.string().min(1),
   originalFilename: z.string().optional(),
@@ -65,6 +67,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     survey.droneJob?.operatorId === session.user.id;
   if (!isOwner && !isOperator && session.user.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // The photo limit is enforced here too, not only when the upload is signed (BL-066 / SPEC-021 C2).
+  if (survey._count.images >= MAX_IMAGES) {
+    return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per survey` }, { status: 400 });
   }
 
   const body = await req.json();
