@@ -1,6 +1,6 @@
 // The legal part of the public footers (BL-057 / SPEC-024 D2, E1): links to the
 // Terms and Privacy notice, and the copyright line. SkyVault is not a limited
-// company, so the line says "SkyVault", never "SkyVault Ltd".
+// company, so the line names it as plain "SkyVault".
 import Link from "next/link";
 
 export function LegalFooter() {
