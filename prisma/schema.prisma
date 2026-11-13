@@ -50,6 +50,7 @@ enum RoofPart {
   gutter
   flashing
   overview
+  secondary_roof
 }
 
 enum Aspect {

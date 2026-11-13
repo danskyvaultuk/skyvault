@@ -56,6 +56,12 @@ describe("PhotoTagSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("has secondary_roof for flat roofs, dormers, bays and porches (BL-076 / SPEC-023 B2)", () => {
+    expect(ROOF_PARTS).toContain("secondary_roof");
+    expect(ROOF_PART_LABELS.secondary_roof).toBe("Flat roof, dormer, bay or porch");
+    expect(PhotoTagSchema.safeParse({ roofParts: ["secondary_roof"] }).success).toBe(true);
+  });
+
   it("every ROOF_PARTS value has a display label", () => {
     for (const part of ROOF_PARTS) {
       expect(ROOF_PART_LABELS[part]).toBeTruthy();

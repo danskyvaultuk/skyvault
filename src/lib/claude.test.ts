@@ -156,6 +156,18 @@ describe("analyzeRoof — photo labels (BL-021)", () => {
   });
 });
 
+describe("analyzeRoof — the secondary_roof label (BL-076 / SPEC-023 C1)", () => {
+  it("lists a secondary_roof photo in <photo_labels> and explains the label in the system prompt", async () => {
+    mockClaudeReturns(VALID_RESPONSE_JSON);
+    await analyzeRoof(["a", "b"], ["image/jpeg", "image/jpeg"], undefined, null, [["side"], ["secondary_roof"]]);
+    const call = mockCreate.mock.calls[0][0];
+    expect(call.messages[0].content.at(-1).text).toContain("<photo_labels>\nImage 0: side\nImage 1: secondary_roof\n</photo_labels>");
+    const system = call.system as string;
+    expect(system).toMatch(/secondary_roof[^.]*flat roof, dormer, bay window or porch roof/i);
+    expect(system).toMatch(/secondary_roof[^.]*not the main roof slopes/i);
+  });
+});
+
 describe("analyzeRoof — defect priority, location and the rubric (BL-003 / BL-009)", () => {
   const withDefect = (defect: Record<string, unknown>, score = 8) => ({
     ...VALID_RESPONSE_JSON,

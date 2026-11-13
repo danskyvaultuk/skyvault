@@ -5,7 +5,7 @@
 import type { RoofPart } from "@/lib/photoTag";
 
 export type ChecklistItem = {
-  id: "ridge" | "front_slope" | "rear_slope" | "gutters" | "chimney_flashings";
+  id: "ridge" | "front_slope" | "rear_slope" | "gutters" | "chimney_flashings" | "side_slopes" | "secondary_roofs";
   label: string;
   hint: string;
   roofParts: readonly RoofPart[];
@@ -21,6 +21,20 @@ export const CHECKLIST: readonly ChecklistItem[] = [
     label: "Chimney and flashings",
     hint: "The chimney and the metal strips where the roof meets walls or the chimney.",
     roofParts: ["chimney", "flashing"],
+  },
+  // BL-076: the checklist was written for a gable roof. A hipped roof also
+  // slopes at the sides, and many houses have smaller roofs besides the main one.
+  {
+    id: "side_slopes",
+    label: "Side slopes",
+    hint: "If your roof also slopes down at the sides (a hipped roof), photograph each side. If the sides are flat brick walls, or you're mid-terrace, mark this as not applicable.",
+    roofParts: ["side"],
+  },
+  {
+    id: "secondary_roofs",
+    label: "Flat roofs, dormers, bays and porches",
+    hint: "Any flat roof (such as on an extension or garage), dormer window, bay window roof or porch roof. If you have none of these, mark this as not applicable.",
+    roofParts: ["secondary_roof"],
   },
 ];
 

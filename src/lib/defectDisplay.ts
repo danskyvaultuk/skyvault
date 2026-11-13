@@ -30,7 +30,11 @@ function capitalise(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-/** The customer's own name for a photo: its checklist shot, else its first label. */
+/**
+ * The customer's own name for a photo: its checklist shot, else its first label.
+ * Every checklist item counts, so a `side` photo reads "your side slopes photo"
+ * and a `secondary_roof` one "your flat roofs, dormers, bays and porches photo" (BL-076).
+ */
 function photoLabel(roofParts: readonly string[] | undefined): string | null {
   if (!roofParts || roofParts.length === 0) return null;
   const shot = CHECKLIST.find((item) => item.roofParts.some((p) => roofParts.includes(p)));
