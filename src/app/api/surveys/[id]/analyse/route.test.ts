@@ -101,6 +101,17 @@ describe("POST /api/surveys/[id]/analyse", () => {
     expect(claim).toBeLessThan(run);
   });
 
+  it("starts analysis when the checklist's side slopes and other-roof photos are missing (BL-076 / SPEC-023 A2)", async () => {
+    // Only front and back photos: no side, no secondary_roof. Missing checklist shots warn on the page; they never block.
+    mockSurveyFindUnique.mockResolvedValue(
+      survey({ images: [{ id: "img-1", roofParts: ["front"] }, { id: "img-2", roofParts: ["back"] }] })
+    );
+    const res = await analyse();
+    expect(res.status).toBe(202);
+    await background();
+    expect(mockPipeline).toHaveBeenCalledTimes(1);
+  });
+
   it("answers 202 at once, without waiting for the pipeline (BL-023)", async () => {
     let finish: () => void = () => {};
     mockPipeline.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
