@@ -1,5 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from "@react-pdf/renderer";
-import { REPORT_DISCLAIMER, TERMS_REFERENCE } from "@/content/legal/disclaimer";
+import { PDF_FOOTER_LINE, REPORT_DISCLAIMER, TERMS_REFERENCE } from "@/content/legal/disclaimer";
 import React from "react";
 import type { ReportAnalysis } from "./claude";
 import { roofContextSummaryLines, type RoofContext } from "./roofContext";
@@ -12,6 +12,8 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
     fontSize: 10,
     padding: 48,
+    // Room for the fixed footer below the content (BL-057 / SPEC-025 B2).
+    paddingBottom: 72,
     backgroundColor: "#ffffff",
     color: "#1a1a1a",
   },
@@ -57,18 +59,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   urgentText: { color: "#b91c1c", fontFamily: "Helvetica-Bold", fontSize: 10 },
+  // One short centred line (BL-057 / SPEC-025 B1); the full disclaimer is the
+  // report's "Important" section, where it has room to be read.
   footer: {
     position: "absolute",
-    bottom: 32,
+    bottom: 28,
     left: 48,
     right: 48,
-    flexDirection: "row",
-    justifyContent: "space-between",
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
     paddingTop: 8,
   },
-  footerText: { fontSize: 8, color: "#9ca3af" },
+  footerText: { fontSize: 8, color: "#9ca3af", textAlign: "center" },
+  disclaimerText: { fontSize: 10, color: "#374151" },
 });
 
 // ── Priority colour (BL-009; "critical" only on reports from before priorities) ─
@@ -250,12 +253,17 @@ export function ReportDocument({
           </View>
         )}
 
-        {/* Footer */}
-        <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvaultuk.com</Text>
-          <Text style={styles.footerText}>
+        {/* The full disclaimer, readable in the report itself (BL-057 / SPEC-025 A1) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Important</Text>
+          <Text style={styles.disclaimerText}>
             {REPORT_DISCLAIMER} {TERMS_REFERENCE}
           </Text>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer} fixed>
+          <Text style={styles.footerText}>{PDF_FOOTER_LINE}</Text>
         </View>
       </Page>
 
@@ -285,10 +293,7 @@ export function ReportDocument({
           </View>
 
           <View style={styles.footer} fixed>
-            <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvaultuk.com</Text>
-            <Text style={styles.footerText}>
-              {REPORT_DISCLAIMER} {TERMS_REFERENCE}
-            </Text>
+            <Text style={styles.footerText}>{PDF_FOOTER_LINE}</Text>
           </View>
         </Page>
       )}

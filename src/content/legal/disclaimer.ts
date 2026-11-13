@@ -7,3 +7,9 @@ export const REPORT_DISCLAIMER =
 
 /** How the PDF and emails point to the terms, where a page link is not available. */
 export const TERMS_REFERENCE = "See our Terms & Conditions on the SkyVault website.";
+
+/**
+ * The PDF's footer line on every page (BL-057 / SPEC-025 B1). It is short
+ * enough to fit one line; the full disclaimer is a section of the report.
+ */
+export const PDF_FOOTER_LINE = "SkyVault · AI-assisted assessment, not a professional survey · see the disclaimer";
