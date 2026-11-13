@@ -5,10 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { runAnalysisPipeline } from "@/lib/pipeline";
 import { analysisLimitReached } from "@/lib/analysisLimit";
 import { reportError } from "@/lib/monitoring";
+import { isStaleAnalysis, staleAnalysisCutoff } from "@/lib/surveyState";
 
 type SurveyToAnalyse = {
   customerId: string;
   status: string;
+  updatedAt: Date;
   images: unknown[];
   report: { id: string } | null;
 };
@@ -19,8 +21,10 @@ function notReady(survey: SurveyToAnalyse, userId: string, role: string): NextRe
   if (survey.customerId !== userId && role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  // Must be draft or pending (pending = drone operator finished uploading)
-  if (survey.status !== "draft" && survey.status !== "pending") {
+  // Must be draft or pending (pending = drone operator finished uploading), or an
+  // analysis that stopped without finishing (BL-066 / SPEC-021 E2)
+  const ready = survey.status === "draft" || survey.status === "pending" || isStaleAnalysis(survey);
+  if (!ready) {
     return NextResponse.json({ error: `Survey is already ${survey.status}` }, { status: 400 });
   }
   // Enforce at least 1 image
@@ -58,7 +62,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Claim the survey in one conditional update so concurrent calls cannot both run the pipeline
   const claim = await prisma.survey.updateMany({
-    where: { id: surveyId, status: { in: ["draft", "pending"] } },
+    where: {
+      id: surveyId,
+      OR: [{ status: { in: ["draft", "pending"] } }, { status: "analysing", updatedAt: { lt: staleAnalysisCutoff() } }],
+    },
     data: { status: "analysing" },
   });
   if (claim.count === 0) {

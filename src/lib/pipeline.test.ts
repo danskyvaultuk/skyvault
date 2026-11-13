@@ -16,6 +16,8 @@ const mockDistributeLeads = vi.fn();
 const mockNotifyCustomer = vi.fn();
 const mockRenderReportPDF = vi.fn();
 const switches = { droneEnabled: false, rooferEnabled: false };
+// Reports kept only when the transaction that wrote them finishes (BL-066).
+const committedReports: unknown[] = [];
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -25,6 +27,22 @@ vi.mock("@/lib/prisma", () => ({
     },
     report: {
       create: (...args: unknown[]) => mockReportCreate(...args),
+    },
+    $transaction: async (work: (tx: unknown) => Promise<unknown>) => {
+      const pending: unknown[] = [];
+      const tx = {
+        report: {
+          create: async (...args: unknown[]) => {
+            const created = await mockReportCreate(...args);
+            pending.push(created);
+            return created;
+          },
+        },
+        survey: { update: (...args: unknown[]) => mockSurveyUpdate(...args) },
+      };
+      const result = await work(tx);
+      committedReports.push(...pending);
+      return result;
     },
   },
 }));
@@ -106,6 +124,7 @@ beforeEach(() => {
     "fetch",
     vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }))
   );
+  committedReports.length = 0;
   mockSurveyFindUnique.mockReset();
   mockSurveyUpdate.mockReset().mockResolvedValue({});
   mockReportCreate.mockReset().mockResolvedValue({ id: "report-1" });
@@ -286,5 +305,26 @@ describe("runAnalysisPipeline — recorded timing (BL-023 / SPEC-015 C)", () => 
     mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
     await runAnalysisPipeline("survey-1");
     expect(mockReportCreate.mock.calls[0][0].data.rawAiResponse).toMatchObject({ condition_score: 8, confidence: "high" });
+  });
+});
+
+describe("runAnalysisPipeline — report and completion saved together (BL-066 / SPEC-021 E1)", () => {
+  it("keeps the report and marks the survey complete in one transaction", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+    await runAnalysisPipeline("survey-1");
+    expect(committedReports).toEqual([{ id: "report-1" }]);
+    expect(mockSurveyUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "complete" } }));
+  });
+
+  it("leaves no report when marking the survey complete fails, and marks it failed", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+    mockSurveyUpdate.mockImplementation(async ({ data }: { data: { status: string } }) => {
+      if (data.status === "complete") throw new Error("write failed");
+      return {};
+    });
+
+    await expect(runAnalysisPipeline("survey-1")).rejects.toThrow("write failed");
+    expect(committedReports).toEqual([]);
+    expect(mockSurveyUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ data: { status: "failed" } }));
   });
 });

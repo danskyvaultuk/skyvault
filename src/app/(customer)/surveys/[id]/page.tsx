@@ -9,6 +9,7 @@ import { PhotoTagGrid, type TaggablePhoto } from "@/components/surveys/photo-tag
 import { DroneBookingPanel } from "./drone-booking";
 import { journeys } from "@/lib/journeys";
 import { isReportReleased } from "@/lib/reportRelease";
+import { effectiveSurveyStatus } from "@/lib/surveyState";
 import type { ReportStatus } from "@prisma/client";
 
 interface DroneJob {
@@ -20,6 +21,7 @@ interface DroneJob {
 interface Survey {
   id: string;
   status: string;
+  updatedAt: string;
   type: string;
   notes?: string;
   roofContext?: RoofContext | null;
@@ -68,7 +70,8 @@ export default function SurveyPage() {
     return fetch(`/api/surveys/${id}`)
       .then((r) => r.json())
       .then((data) => {
-        setSurvey(data);
+        // A survey stuck in "analysing" shows as failed, with its retry (BL-066)
+        setSurvey({ ...data, status: effectiveSurveyStatus(data) });
         setImageCount(data.images?.length ?? 0);
         setNotes(data.notes ?? "");
         return data;

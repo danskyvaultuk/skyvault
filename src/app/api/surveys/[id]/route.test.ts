@@ -108,3 +108,25 @@ describe("PATCH /api/surveys/[id] — notes (BL-066)", () => {
     expect(mockSurveyUpdate.mock.calls[0][0].data.notes).toHaveLength(2000);
   });
 });
+
+describe("PATCH /api/surveys/[id] — retrying an analysis that stopped (BL-066)", () => {
+  const MINUTE = 60 * 1000;
+  function reset(updatedAt: Date) {
+    mockAuth.mockResolvedValue(OWNER);
+    mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", status: "analysing", updatedAt });
+    mockSurveyUpdate.mockReset().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: "survey-1", ...data }));
+    return PATCH(new Request("http://localhost/api/surveys/survey-1", { method: "PATCH", body: JSON.stringify({ status: "draft" }) }), {
+      params: Promise.resolve({ id: "survey-1" }),
+    });
+  }
+
+  it("resets a survey analysing for over 10 minutes to draft", async () => {
+    await reset(new Date(Date.now() - 11 * MINUTE));
+    expect(mockSurveyUpdate.mock.calls[0][0].data.status).toBe("draft");
+  });
+
+  it("does not reset a survey analysing for under 10 minutes", async () => {
+    await reset(new Date(Date.now() - 9 * MINUTE));
+    expect(mockSurveyUpdate.mock.calls[0][0].data.status).toBeUndefined();
+  });
+});

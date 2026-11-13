@@ -5,6 +5,7 @@ import type { SurveyStatus, Prisma } from "@prisma/client";
 import { RoofContextSchema, sanitizeRoofContext } from "@/lib/roofContext";
 import { getPresignedReadUrl } from "@/lib/r2";
 import { SurveyNotesSchema } from "@/lib/surveyNotes";
+import { isStaleAnalysis } from "@/lib/surveyState";
 import { reportForViewer } from "@/lib/reportRelease";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -68,7 +69,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!notes.success) return NextResponse.json({ error: notes.error.flatten() }, { status: 400 });
     data.notes = notes.data;
   }
-  if (body.status === "draft" && survey.status === "failed") data.status = "draft";
+  // A stale analysis counts as failed and can be reset too (BL-066 / SPEC-021 E2)
+  if (body.status === "draft" && (survey.status === "failed" || isStaleAnalysis(survey))) data.status = "draft";
 
   // Opt-in roof Q&A — same draft-only window as notes. Every field is optional;
   // an empty object is valid (customer skipped everything).
