@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { journeys } from "@/lib/journeys";
 import { JourneyGuard } from "@/lib/journeyGuard";
 import { loginPathFor } from "@/lib/returnPath";
+import { isPublicPath } from "@/lib/publicPaths";
 
 const { auth } = NextAuth(authConfig);
 
@@ -26,17 +27,7 @@ export default auth((req) => {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const isPublic =
-    pathname === "/" ||
-    pathname.startsWith("/blog") ||
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/verify") ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/stripe/webhook") ||
-    pathname.startsWith("/auth/redirect");
-
-  if (isPublic) return NextResponse.next();
+  if (isPublicPath(pathname)) return NextResponse.next();
 
   try {
     const session = req.auth;
