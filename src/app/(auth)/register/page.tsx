@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { SignInAgreement } from "@/components/legal/sign-in-agreement";
 import { journeys } from "@/lib/journeys";
 
 const ROLES = [
@@ -193,6 +194,8 @@ function RegisterForm() {
           >
             {loading ? "Creating account…" : "Create account"}
           </button>
+
+          <SignInAgreement />
 
           <p className="text-center text-sm text-gray-500">
             Already have an account?{" "}

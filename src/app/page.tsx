@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalFooter } from "@/components/legal/legal-footer";
 import { journeys } from "@/lib/journeys";
 import { homeContent, type Plan } from "@/content/homeContent";
 import { visibleBlogPosts } from "@/content/blogVisibility";
@@ -206,7 +207,7 @@ export default function LandingPage() {
             <Link key={link.href} href={link.href} className="hover:text-gray-900">{link.label}</Link>
           ))}
         </div>
-        <p>© 2026 SkyVault Ltd. All rights reserved.</p>
+        <LegalFooter />
         <p className="mt-1">AI reports are indicative assessments only and do not replace a physical inspection by a qualified professional.</p>
       </footer>
     </main>
