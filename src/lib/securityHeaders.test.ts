@@ -20,14 +20,19 @@ describe("securityHeaders", () => {
     expect(csp).toContain("base-uri 'self'");
   });
 
-  it("admits the launch journey's storage, Sentry, address lookup and Google sign-in", () => {
+  it("admits the launch journey's storage, Sentry and Google sign-in", () => {
     const csp = contentSecurityPolicy({ NODE_ENV: "production" });
     expect(csp).toMatch(/connect-src [^;]*https:\/\/\*\.amazonaws\.com/);
     expect(csp).toMatch(/connect-src [^;]*https:\/\/\*\.ingest\.de\.sentry\.io/);
     expect(csp).toMatch(/img-src [^;]*https:/);
-    expect(csp).toMatch(/connect-src [^;]*https:\/\/nominatim\.openstreetmap\.org/);
-    expect(csp).toMatch(/connect-src [^;]*https:\/\/api\.postcodes\.io/);
     expect(csp).toMatch(/form-action [^;]*https:\/\/accounts\.google\.com/);
+  });
+
+  it("admits no address lookup host: the browser only calls SkyVault's own route (BL-074 / SPEC-022 C2)", () => {
+    const connectSrc = /connect-src ([^;]*)/.exec(contentSecurityPolicy({ NODE_ENV: "production" }))?.[1] ?? "";
+    expect(connectSrc).not.toContain("nominatim.openstreetmap.org");
+    expect(connectSrc).not.toContain("api.postcodes.io");
+    expect(connectSrc).not.toContain("ideal-postcodes");
   });
 
   it("allows eval only outside production", () => {

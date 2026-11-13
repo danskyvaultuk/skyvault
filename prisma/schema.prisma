@@ -119,6 +119,7 @@ model User {
   subscription Subscription?
   leadClaims   LeadClaim[]
   droneJobs    DroneJob[]    @relation("OperatorJobs")
+  addressLookups AddressLookup[]
 
   @@index([role])
   @@index([postcode])
@@ -322,4 +323,16 @@ model Subscription {
 
   @@index([stripeSubId])
   @@index([status])
+}
+
+// One row per postcode lookup that returned addresses (BL-074 / SPEC-022 A5),
+// so the daily per-user limit holds across serverless invocations.
+model AddressLookup {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
