@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalFooter } from "@/components/legal/legal-footer";
 import Image from "next/image";
 import { blogPosts } from "@/data/blogPosts";
 import { notFound } from "next/navigation";
@@ -317,7 +318,7 @@ export default function BlogPost3DDemo() {
           <Link href="/blog" className="hover:text-gray-900">Blog</Link>
           <Link href="/login" className="hover:text-gray-900">Sign in</Link>
         </div>
-        <p>© 2026 SkyVault Ltd. All rights reserved.</p>
+        <LegalFooter />
         <p className="mt-1 text-xs">
           AI reports are indicative assessments only and do not replace a physical
           inspection by a qualified professional.

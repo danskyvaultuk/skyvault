@@ -11,6 +11,7 @@ import type { StoredDefect } from "@/lib/claude";
 import { RooferRequestSection } from "./roofer-request";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { ReportDisclaimer } from "@/components/legal/report-disclaimer";
 
 function ScoreGauge({ score }: { score: number }) {
   const colour =
@@ -258,11 +259,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      {/* Disclaimer */}
-      <p className="text-xs text-gray-400 mt-6">
-        This report is AI-generated and intended as a guide only. It should be verified by a
-        qualified roofing professional before any work is commissioned.
-      </p>
+      {/* Disclaimer (BL-057 / SPEC-024 C1) */}
+      <ReportDisclaimer />
     </div>
   );
 }

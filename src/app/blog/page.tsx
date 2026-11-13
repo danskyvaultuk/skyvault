@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalFooter } from "@/components/legal/legal-footer";
 import Image from "next/image";
 import { blogPosts } from "@/data/blogPosts";
 import { journeys } from "@/lib/journeys";
@@ -98,7 +99,7 @@ export default function BlogIndexPage() {
           <Link href="/" className="hover:text-gray-900">Home</Link>
           <Link href="/login" className="hover:text-gray-900">Sign in</Link>
         </div>
-        <p>© 2026 SkyVault Ltd. All rights reserved.</p>
+        <LegalFooter />
       </footer>
     </main>
   );

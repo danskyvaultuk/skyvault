@@ -1,4 +1,5 @@
 import { appBaseUrl } from "@/lib/appUrl";
+import { REPORT_DISCLAIMER } from "@/content/legal/disclaimer";
 import { reportError } from "@/lib/monitoring";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
@@ -127,6 +128,7 @@ export async function notifyCustomerReportReady({
       <p>Your roof survey has been analysed by our AI and your report is ready to view.</p>
       ${attachment ? "<p>Your report is also attached to this email as a PDF.</p>" : ""}
       <p><a href="${reportUrl}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">View your report →</a></p>
+      <p style="color:#6b7280;font-size:12px;">${REPORT_DISCLAIMER} See our <a href="${appLink("/terms")}">Terms &amp; Conditions</a>.</p>
       <p style="color:#6b7280;font-size:12px;">SkyVault — AI-powered roof surveys</p>
     `,
     ...(attachment ? { attachments: [attachment] } : {}),

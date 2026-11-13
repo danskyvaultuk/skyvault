@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet, renderToBuffer, Image } from "@react-pdf/renderer";
+import { REPORT_DISCLAIMER, TERMS_REFERENCE } from "@/content/legal/disclaimer";
 import React from "react";
 import type { ReportAnalysis } from "./claude";
 import { roofContextSummaryLines, type RoofContext } from "./roofContext";
@@ -134,7 +135,7 @@ function scoreLabel(score: number): string {
 }
 
 // ── PDF Document ───────────────────────────────────────────────────────────────
-function ReportDocument({
+export function ReportDocument({
   analysis,
   address,
   postcode,
@@ -253,7 +254,7 @@ function ReportDocument({
         <View style={styles.footer} fixed>
           <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvaultuk.com</Text>
           <Text style={styles.footerText}>
-            This report is AI-generated and should be verified by a qualified roofer.
+            {REPORT_DISCLAIMER} {TERMS_REFERENCE}
           </Text>
         </View>
       </Page>
@@ -286,7 +287,7 @@ function ReportDocument({
           <View style={styles.footer} fixed>
             <Text style={styles.footerText}>SkyVault AI Roof Survey · skyvaultuk.com</Text>
             <Text style={styles.footerText}>
-              This report is AI-generated and should be verified by a qualified roofer.
+              {REPORT_DISCLAIMER} {TERMS_REFERENCE}
             </Text>
           </View>
         </Page>

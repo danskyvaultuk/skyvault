@@ -82,3 +82,13 @@ describe("sendEmail — a failed send is reported without the recipient (SPEC-02
     expect(JSON.stringify([error.message, context])).not.toContain("jane@example.com");
   });
 });
+
+describe("notifyCustomerReportReady — the report disclaimer (BL-057 / SPEC-024 C1)", () => {
+  it("carries the report disclaimer and a link to the Terms", async () => {
+    const { REPORT_DISCLAIMER } = await import("@/content/legal/disclaimer");
+    await notifyCustomerReportReady({ ...BASE, pdf: null });
+    const { html } = sentBody();
+    expect(html).toContain(REPORT_DISCLAIMER);
+    expect(html).toContain('href="https://app.example/terms"');
+  });
+});

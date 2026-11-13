@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { SignInAgreement } from "@/components/legal/sign-in-agreement";
 import { journeys } from "@/lib/journeys";
 import { RETURN_PARAM, signInReturnPath } from "@/lib/returnPath";
 
@@ -101,6 +102,7 @@ return (
                 Continue with Google
               </button>
             </div>
+            <SignInAgreement />
 
 
             <div className="mt-6 pt-6 border-t text-center">
