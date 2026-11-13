@@ -49,6 +49,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return NextResponse.json(images);
 }
 
+type SurveyForRegister = {
+  customerId: string;
+  droneJob: { operatorId: string | null } | null;
+  _count: { images: number };
+};
+
+// Why this caller may not add a photo to this survey, or null when they may.
+function registerRefusal(survey: SurveyForRegister, user: { id: string; role: string }): NextResponse | null {
+  const isOwner = survey.customerId === user.id;
+  const isOperator = user.role === "drone" && survey.droneJob?.operatorId === user.id;
+  if (!isOwner && !isOperator && user.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  // The photo limit is enforced here too, not only when the upload is signed (BL-066 / SPEC-021 C2).
+  if (survey._count.images >= MAX_IMAGES) {
+    return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per survey` }, { status: 400 });
+  }
+  return null;
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -61,18 +81,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   if (!survey) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const isOwner = survey.customerId === session.user.id;
-  const isOperator =
-    session.user.role === "drone" &&
-    survey.droneJob?.operatorId === session.user.id;
-  if (!isOwner && !isOperator && session.user.role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  // The photo limit is enforced here too, not only when the upload is signed (BL-066 / SPEC-021 C2).
-  if (survey._count.images >= MAX_IMAGES) {
-    return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per survey` }, { status: 400 });
-  }
+  const refusal = registerRefusal(survey, session.user);
+  if (refusal) return refusal;
 
   const body = await req.json();
   const parsed = registerSchema.safeParse(body);
