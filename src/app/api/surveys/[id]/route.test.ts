@@ -81,9 +81,9 @@ describe("GET /api/surveys/[id] — held reports (BL-061)", () => {
 });
 
 describe("PATCH /api/surveys/[id] — notes (BL-066)", () => {
-  function patch(body: Record<string, unknown>) {
+  function patch(body: Record<string, unknown>, status = "draft") {
     mockAuth.mockResolvedValue(OWNER);
-    mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", status: "draft" });
+    mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", status });
     mockSurveyUpdate.mockReset().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({ id: "survey-1", ...data }));
     return PATCH(new Request("http://localhost/api/surveys/survey-1", { method: "PATCH", body: JSON.stringify(body) }), {
       params: Promise.resolve({ id: "survey-1" }),
@@ -98,6 +98,12 @@ describe("PATCH /api/surveys/[id] — notes (BL-066)", () => {
 
   it("refuses notes that are not text", async () => {
     const res = await patch({ notes: { text: "hi" } });
+    expect(res.status).toBe(400);
+    expect(mockSurveyUpdate).not.toHaveBeenCalled();
+  });
+
+  it("refuses invalid notes on a survey past draft too", async () => {
+    const res = await patch({ notes: "x".repeat(2001) }, "complete");
     expect(res.status).toBe(400);
     expect(mockSurveyUpdate).not.toHaveBeenCalled();
   });

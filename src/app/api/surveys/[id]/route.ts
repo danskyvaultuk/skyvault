@@ -63,12 +63,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Allow resetting a failed survey back to draft for retry
   const data: { notes?: string; status?: SurveyStatus; roofContext?: Prisma.InputJsonValue } = {};
   // Allow updating notes freely while the survey is still in draft
-  if (body.notes !== undefined && survey.status === "draft") {
-    // A string of at most 2,000 characters (BL-066 / SPEC-021 C4).
-    const notes = SurveyNotesSchema.safeParse(body.notes);
-    if (!notes.success) return NextResponse.json({ error: notes.error.flatten() }, { status: 400 });
-    data.notes = notes.data;
-  }
+  // Notes must be a string of at most 2,000 characters, whatever the status (BL-066 / SPEC-021 C4)
+  const notes = body.notes === undefined ? null : SurveyNotesSchema.safeParse(body.notes);
+  if (notes && !notes.success) return NextResponse.json({ error: notes.error.flatten() }, { status: 400 });
+  if (notes?.success && survey.status === "draft") data.notes = notes.data;
   // A stale analysis counts as failed and can be reset too (BL-066 / SPEC-021 E2)
   if (body.status === "draft" && (survey.status === "failed" || isStaleAnalysis(survey))) data.status = "draft";
 

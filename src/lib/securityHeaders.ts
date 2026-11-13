@@ -7,7 +7,8 @@ export type SecurityHeader = { key: string; value: string };
  * The Content-Security-Policy admits only what the launch journey uses:
  * - scripts and styles from this site (Next.js needs inline bootstrap code;
  *   development tooling also needs eval);
- * - photos shown from the storage bucket, uploaded to it from the browser;
+ * - photos shown from the storage bucket, uploaded to it from the browser
+ *   (src/lib/r2.ts signs AWS S3 URLs, <bucket>.s3.<region>.amazonaws.com);
  * - browser errors sent to Sentry's EU ingest;
  * - address and postcode lookup on the add-a-property page;
  * - Google sign-in, which the login form redirects to.

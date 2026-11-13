@@ -75,7 +75,10 @@ function RegisterForm() {
       return;
     }
 
-    // Send a magic link to verify their email before letting them in
+    // Send a magic link to verify their email before letting them in. The
+    // register route answers an existing address exactly as a new one
+    // (BL-066 / SPEC-021 D1), so an existing customer reaches this line too and
+    // simply gets a sign-in link.
     const callbackUrl = "/auth/redirect";
 
     const result = await signIn("resend", { email, redirect: false, callbackUrl });
