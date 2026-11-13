@@ -1,3 +1,5 @@
+import { auth } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -45,6 +47,10 @@ const SCORE_COLOUR = (score: number) =>
   score <= 3 ? "text-red-600" : score <= 6 ? "text-amber-500" : "text-green-600";
 
 export default async function AdminDashboard() {
+  // Each admin page checks the role itself (BL-066 / SPEC-021 B2).
+  const session = await auth();
+  if (!session || session.user.role !== "admin") redirect("/login");
+
   const [
     userCount,
     rooferCount,
