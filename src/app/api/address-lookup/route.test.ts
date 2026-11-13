@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockAuth = vi.fn();
 const mockCount = vi.fn();
 const mockCreate = vi.fn();
-const mockReportError = vi.fn();
+const mockCaptureException = vi.fn();
 const mockFetch = vi.fn();
 
 vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
@@ -15,7 +15,10 @@ vi.mock("@/lib/prisma", () => ({
     },
   },
 }));
-vi.mock("@/lib/monitoring", () => ({ reportError: (...args: unknown[]) => mockReportError(...args) }));
+// The real reportError runs, so these tests show the failure reaching Sentry
+// itself (SPEC-022 A4) and what is sent with it.
+vi.mock("@sentry/nextjs", () => ({ captureException: (...args: unknown[]) => mockCaptureException(...args) }));
+vi.spyOn(console, "error").mockImplementation(() => {});
 
 const { GET } = await import("./route");
 
@@ -29,6 +32,12 @@ function lookup(postcode: string) {
   return GET(new Request(`http://localhost/api/address-lookup?postcode=${encodeURIComponent(postcode)}`));
 }
 
+/** What one Sentry report carried: the error's message and its tags and extras. */
+function sentToSentry(call: number) {
+  const [error, hint] = mockCaptureException.mock.calls[call];
+  return JSON.stringify({ message: (error as Error).message, hint });
+}
+
 function providerReplies(status: number, body: unknown) {
   mockFetch.mockImplementation(async () => new Response(JSON.stringify(body), { status }));
 }
@@ -39,7 +48,7 @@ beforeEach(() => {
   mockAuth.mockReset().mockResolvedValue({ user: { id: "user-1", role: "customer" } });
   mockCount.mockReset().mockResolvedValue(0);
   mockCreate.mockReset().mockResolvedValue({});
-  mockReportError.mockReset();
+  mockCaptureException.mockReset();
   mockFetch.mockReset();
   providerReplies(200, FOUND);
 });
@@ -93,30 +102,30 @@ describe("GET /api/address-lookup (BL-074 / SPEC-022 Part A)", () => {
     expect(text).not.toContain(KEY);
   });
 
-  it("A4: answers 503 when the key is missing, without calling the provider, and reports it", async () => {
+  it("A4: answers 503 when the key is missing, without calling the provider, and reports it to Sentry", async () => {
     vi.stubEnv("IDEAL_POSTCODES_API_KEY", "");
     const res = await lookup("TQ9 5QH");
     expect(res.status).toBe(503);
     expect((await res.json()).error).toBeTruthy();
     expect(mockFetch).not.toHaveBeenCalled();
-    expect(mockReportError).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
   });
 
-  it("A4: answers 503 when the provider fails, reports it without the postcode, and counts nothing", async () => {
+  it("A4: answers 503 when the provider fails, reports it to Sentry without the postcode or key, and counts nothing", async () => {
     providerReplies(500, { code: 5000 });
     const res = await lookup("TQ9 5QH");
     expect(res.status).toBe(503);
     expect(mockCreate).not.toHaveBeenCalled();
-    expect(mockReportError).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(mockReportError.mock.calls[0])).not.toMatch(/TQ9/i);
-    expect(JSON.stringify(mockReportError.mock.calls[0])).not.toContain(KEY);
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(sentToSentry(0)).not.toMatch(/TQ9/i);
+    expect(sentToSentry(0)).not.toContain(KEY);
   });
 
-  it("A4: answers 503 when the provider cannot be reached, and reports it without the postcode", async () => {
+  it("A4: answers 503 when the provider cannot be reached, and reports it to Sentry without the postcode", async () => {
     mockFetch.mockRejectedValue(new Error("network down"));
     const res = await lookup("TQ9 5QH");
     expect(res.status).toBe(503);
-    expect(JSON.stringify(mockReportError.mock.calls[0])).not.toMatch(/TQ9/i);
+    expect(sentToSentry(0)).not.toMatch(/TQ9/i);
   });
 
   it("A5: accepts the 20th lookup", async () => {
