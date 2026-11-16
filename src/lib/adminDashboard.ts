@@ -5,8 +5,8 @@
 import type { SurveyStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { staleAnalysisCutoff } from "@/lib/surveyState";
-import { ANALYSIS_LIMIT, ANALYSIS_WINDOW_MS } from "@/lib/analysisLimit";
-import { SURVEY_CREATION_LIMIT, SURVEY_CREATION_WINDOW_MS } from "@/lib/surveyLimit";
+import { ANALYSIS_LIMIT, analysesInWindow } from "@/lib/analysisLimit";
+import { SURVEY_CREATION_LIMIT, surveysCreatedInWindow } from "@/lib/surveyLimit";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const RELEASED = ["published", "overridden"] as const;
@@ -76,21 +76,9 @@ function groupQueries(now: Date) {
   return Promise.all([
     prisma.survey.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.photoRefusal.groupBy({ by: ["reason"], where: { createdAt: { gte: weekAgo } }, _count: { _all: true } }),
-    // The analysis limit's own rule (src/lib/analysisLimit.ts).
-    prisma.survey.groupBy({
-      by: ["customerId"],
-      where: {
-        status: { in: ["analysing", "complete", "failed"] },
-        updatedAt: { gte: new Date(now.getTime() - ANALYSIS_WINDOW_MS) },
-      },
-      _count: { _all: true },
-    }),
-    // The survey creation limit's own rule (src/lib/surveyLimit.ts).
-    prisma.survey.groupBy({
-      by: ["customerId"],
-      where: { createdAt: { gte: new Date(now.getTime() - SURVEY_CREATION_WINDOW_MS) } },
-      _count: { _all: true },
-    }),
+    // Each limit's own counting rule, from its module, so the card cannot drift from the limit.
+    prisma.survey.groupBy({ by: ["customerId"], where: analysesInWindow(now), _count: { _all: true } }),
+    prisma.survey.groupBy({ by: ["customerId"], where: surveysCreatedInWindow(now), _count: { _all: true } }),
   ]);
 }
 

@@ -15,6 +15,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 const { loadAdminDashboard, dashboardCards } = await import("./adminDashboard");
+const { analysesInWindow } = await import("./analysisLimit");
+const { surveysCreatedInWindow } = await import("./surveyLimit");
 
 const NOW = new Date("2026-11-16T12:00:00.000Z");
 const ago = (ms: number) => new Date(NOW.getTime() - ms);
@@ -86,10 +88,10 @@ describe("loadAdminDashboard — each count by its definition (BL-080 / SPEC-029
   it("customers at the daily limit, by each limit's own rule, counted once", async () => {
     const d = await loadAdminDashboard(NOW);
     const limitQueries = calls.surveyGroupBy.mock.calls.map(([a]) => a as Args).filter((a) => a.by?.[0] === "customerId");
-    expect(limitQueries.map((a) => a.where)).toEqual([
-      { status: { in: ["analysing", "complete", "failed"] }, updatedAt: { gte: ago(DAY) } },
-      { createdAt: { gte: ago(DAY) } },
-    ]);
+    // The limits' own rules, as the limits themselves use them.
+    expect(limitQueries.map((a) => a.where)).toEqual([analysesInWindow(NOW), surveysCreatedInWindow(NOW)]);
+    expect(analysesInWindow(NOW)).toEqual({ status: { in: ["analysing", "complete", "failed"] }, updatedAt: { gte: ago(DAY) } });
+    expect(surveysCreatedInWindow(NOW)).toEqual({ createdAt: { gte: ago(DAY) } });
     expect(d.customersAtLimit).toBe(1);
   });
 });

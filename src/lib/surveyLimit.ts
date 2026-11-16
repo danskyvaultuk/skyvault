@@ -7,9 +7,12 @@ import { prisma } from "@/lib/prisma";
 export const SURVEY_CREATION_LIMIT = 5;
 export const SURVEY_CREATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/** The surveys that count towards the limit: created within the window. Shared with the admin dashboard (BL-080). */
+export function surveysCreatedInWindow(now: Date = new Date()) {
+  return { createdAt: { gte: new Date(now.getTime() - SURVEY_CREATION_WINDOW_MS) } };
+}
+
 export async function surveyCreationLimitReached(customerId: string, now: Date = new Date()): Promise<boolean> {
-  const created = await prisma.survey.count({
-    where: { customerId, createdAt: { gte: new Date(now.getTime() - SURVEY_CREATION_WINDOW_MS) } },
-  });
+  const created = await prisma.survey.count({ where: { customerId, ...surveysCreatedInWindow(now) } });
   return created >= SURVEY_CREATION_LIMIT;
 }
