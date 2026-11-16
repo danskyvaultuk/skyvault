@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { journeys } from "@/lib/journeys";
 import { prisma } from "@/lib/prisma";
 import { VerifyToggle } from "./verify-toggle";
 
@@ -7,6 +8,8 @@ export default async function AdminRoofersPage() {
   // Each admin page checks the role itself (BL-066 / SPEC-021 B2).
   const session = await auth();
   if (!session || session.user.role !== "admin") redirect("/login");
+  // Not found while the roofer journey is off (BL-080 / SPEC-029 D1).
+  if (!journeys.rooferEnabled) notFound();
 
   const roofers = await prisma.user.findMany({
     where: { role: "roofer" },

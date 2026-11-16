@@ -4,14 +4,22 @@ const mockAuth = vi.fn();
 const mockSurveyFindUnique = vi.fn();
 const mockImageCreate = vi.fn();
 const mockImageFindMany = vi.fn();
+const mockRefusalCreate = vi.fn();
+const mockReportError = vi.fn();
 
 vi.mock("@/lib/auth", () => ({ auth: () => mockAuth() }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     survey: { findUnique: (...args: unknown[]) => mockSurveyFindUnique(...args) },
     image: { create: (...args: unknown[]) => mockImageCreate(...args), findMany: (...args: unknown[]) => mockImageFindMany(...args) },
+    photoRefusal: { create: (...args: unknown[]) => mockRefusalCreate(...args) },
   },
 }));
+// Watched, but the real reporter still runs (its log line is checked elsewhere in this file).
+vi.mock("@/lib/monitoring", async (importOriginal) => {
+  const real = await importOriginal<typeof import("@/lib/monitoring")>();
+  return { ...real, reportError: (...args: Parameters<typeof real.reportError>) => { mockReportError(...args); real.reportError(...args); } };
+});
 
 const mockAssess = vi.fn();
 vi.mock("@/lib/r2", () => ({ getPresignedReadUrl: vi.fn(async () => "https://storage.test/signed") }));
@@ -40,6 +48,8 @@ function register(body: Record<string, unknown>) {
 }
 
 beforeEach(() => {
+  mockRefusalCreate.mockReset().mockResolvedValue({});
+  mockReportError.mockReset();
   mockFetch.mockReset().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) });
   vi.stubGlobal("fetch", mockFetch);
   mockAssess.mockReset().mockResolvedValue(ACCEPTED);
@@ -254,5 +264,30 @@ describe("POST /api/surveys/[id]/images — only keys issued for this survey (BL
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockAssess).not.toHaveBeenCalled();
     expect(mockImageCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/surveys/[id]/images — photo refusals recorded (BL-080 / SPEC-029 C1, C2)", () => {
+  it("C1: a refused photo records one refusal with its reason, and nothing about the photo", async () => {
+    mockAssess.mockResolvedValue({ outcome: "rejected", reason: "too-blurry", width: 4032, height: 3024, sharpness: 3.1 });
+    const res = await register({});
+    expect(res.status).toBe(422);
+    expect(mockRefusalCreate).toHaveBeenCalledTimes(1);
+    expect(mockRefusalCreate).toHaveBeenCalledWith({ data: { surveyId: "survey-1", reason: "too-blurry" } });
+  });
+
+  it("C1: an accepted photo records no refusal", async () => {
+    const res = await register({});
+    expect(res.status).toBe(201);
+    expect(mockRefusalCreate).not.toHaveBeenCalled();
+  });
+
+  it("C2: a failed record still gives the customer the refusal and its advice", async () => {
+    mockAssess.mockResolvedValue({ outcome: "rejected", reason: "too-small", width: 640, height: 480, sharpness: 200 });
+    mockRefusalCreate.mockRejectedValue(new Error("database down"));
+    const res = await register({});
+    expect(res.status).toBe(422);
+    expect((await res.json()).guidance).toBeTruthy();
+    expect(mockReportError).toHaveBeenCalledTimes(1);
   });
 });

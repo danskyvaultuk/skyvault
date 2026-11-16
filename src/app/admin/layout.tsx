@@ -3,17 +3,22 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { MobileNav } from "@/components/mobile-nav";
+import { journeys } from "@/lib/journeys";
 
-const nav = [
-  { href: "/admin/dashboard", label: "Dashboard" },
-  { href: "/admin/reports", label: "Reports to review" },
-  { href: "/admin/roofer-requests", label: "Roofer requests" },
-  { href: "/admin/surveys", label: "Surveys" },
-  { href: "/admin/users", label: "Users" },
-  { href: "/admin/roofers", label: "Verify Roofers" },
-];
+// Built per request, so it follows the journey switches (BL-080 / SPEC-029 D1).
+function adminNav() {
+  return [
+    { href: "/admin/dashboard", label: "Dashboard" },
+    { href: "/admin/reports", label: "Reports to review" },
+    { href: "/admin/roofer-requests", label: "Roofer requests" },
+    { href: "/admin/surveys", label: "Surveys" },
+    { href: "/admin/users", label: "Users" },
+    ...(journeys.rooferEnabled ? [{ href: "/admin/roofers", label: "Verify Roofers" }] : []),
+  ];
+}
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const nav = adminNav();
   const session = await auth();
   if (!session || session.user.role !== "admin") redirect("/login");
 

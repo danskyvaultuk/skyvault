@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { ROOF_PARTS, type RoofPart } from "@/lib/photoTag";
 import { checkUploadedPhoto } from "@/lib/uploadCheck";
 import { isIssuedPhotoKey } from "@/lib/photoKeys";
+import { recordPhotoRefusal } from "@/lib/photoRefusals";
 
 const MAX_IMAGES = 10;
 
@@ -102,6 +103,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Too small or too blurry: not saved, and the customer is told how to retake it (BL-018).
   const check = await checkUploadedPhoto(surveyId, parsed.data.s3Key);
   if (check.kind === "rejected") {
+    await recordPhotoRefusal(surveyId, check.reason);
     return NextResponse.json({ error: check.guidance, reason: check.reason, guidance: check.guidance }, { status: 422 });
   }
 
