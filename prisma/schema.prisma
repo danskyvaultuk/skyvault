@@ -193,6 +193,7 @@ model Survey {
   property Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   customer User      @relation("CustomerSurveys", fields: [customerId], references: [id], onDelete: Cascade)
   images   Image[]
+  photoRefusals PhotoRefusal[]
   report   Report?
   droneJob DroneJob?
   lead     Lead?
@@ -336,4 +337,17 @@ model AddressLookup {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+// One row per photo the photo check refused (BL-080 / SPEC-029 C1), so the
+// admin can see how often customers struggle. Never the photo or its key.
+model PhotoRefusal {
+  id        String   @id @default(cuid())
+  surveyId  String
+  reason    String
+  createdAt DateTime @default(now())
+
+  survey Survey @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
 }
