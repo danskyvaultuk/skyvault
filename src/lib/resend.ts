@@ -165,3 +165,57 @@ export async function notifyAdminRooferRequest({
     `,
   });
 }
+
+// A new account was created (BL-084 / SPEC-032 A1). The subject carries no
+// personal data, because a failed email's subject goes to Sentry.
+export async function notifyAdminNewUser({
+  to,
+  name,
+  email,
+  role,
+}: {
+  to: string;
+  name: string | null;
+  email: string;
+  role: string;
+}) {
+  await sendEmail({
+    to,
+    subject: "New SkyVault user — SkyVault",
+    html: `
+      <p>A new SkyVault account has been created.</p>
+      <p><strong>${name?.trim() || "(no name yet)"}</strong> — ${email}<br/>Role: ${role}</p>
+      <p><a href="${appLink("/admin/users")}">All users →</a></p>
+    `,
+  });
+}
+
+// A report is held for the admin's approval (BL-084 / SPEC-032 B1).
+export async function notifyAdminReportWaiting({
+  to,
+  reportId,
+  address,
+  postcode,
+  customer,
+  conditionScore,
+  urgent,
+}: {
+  to: string;
+  reportId: string;
+  address: string;
+  postcode: string;
+  customer: string;
+  conditionScore: number;
+  urgent: boolean;
+}) {
+  await sendEmail({
+    to,
+    subject: "Report waiting for your approval — SkyVault",
+    html: `
+      <p>An AI report is ready and held for your approval. The customer cannot see it until you approve it.</p>
+      <p><strong>${address}, ${postcode}</strong><br/>Customer: ${customer}<br/>Condition score: ${conditionScore}/10</p>
+      ${urgent ? '<p style="color:#b91c1c;font-weight:bold;">Urgent action flagged</p>' : ""}
+      <p><a href="${appLink(`/admin/reports/${reportId}`)}" style="background:#1d4ed8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Review →</a></p>
+    `,
+  });
+}

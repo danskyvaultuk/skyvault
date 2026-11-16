@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { alertReportWaiting } from "@/lib/adminAlerts";
 import { generatePdfKey, uploadBuffer } from "@/lib/r2";
 import { analyzeRoof } from "@/lib/claude";
 import { renderReportPDF } from "@/lib/pdf";
@@ -123,6 +124,17 @@ export async function runAnalysisPipeline(surveyId: string) {
         data: { status: "complete" },
       });
       return created;
+    });
+
+    // ── Tell the admin a report is waiting for approval (BL-084 / SPEC-032 B1) ─
+    // After the transaction, so only a saved report is announced. Never throws.
+    await alertReportWaiting({
+      reportId: report.id,
+      address: survey.property.address,
+      postcode: survey.property.postcode,
+      customer: survey.customer.name?.trim() || survey.customer.email,
+      conditionScore: analysis.condition_score,
+      urgent: analysis.urgent_action_required,
     });
 
     // ── Step 9: Distribute leads (only while the roofer journey is on, BL-058) ─

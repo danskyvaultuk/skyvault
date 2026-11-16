@@ -6,9 +6,9 @@ vi.mock("@/lib/monitoring", () => ({ reportError: (...args: unknown[]) => mockRe
 // The sender reads its settings when the module loads, so set them first.
 vi.stubEnv("RESEND_API_KEY", "test-key");
 vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example");
-const { notifyCustomerReportReady, MAX_REPORT_ATTACHMENT_BYTES } = await import("./resend");
+const { notifyCustomerReportReady, MAX_REPORT_ATTACHMENT_BYTES, notifyAdminNewUser, notifyAdminReportWaiting } = await import("./resend");
 
-type SentBody = { to: string; html: string; attachments?: { filename: string; content: string }[] };
+type SentBody = { to: string; subject: string; html: string; attachments?: { filename: string; content: string }[] };
 
 const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
 
@@ -90,5 +90,46 @@ describe("notifyCustomerReportReady — the report disclaimer (BL-057 / SPEC-024
     const { html } = sentBody();
     expect(html).toContain(REPORT_DISCLAIMER);
     expect(html).toContain('href="https://app.example/terms"');
+  });
+});
+
+describe("notifyAdminNewUser (BL-084 / SPEC-032 A1)", () => {
+  it("names the user, their email and role, and links to all users, with no personal data in the subject", async () => {
+    await notifyAdminNewUser({ to: "admin@skyvaultuk.com", name: "Jane", email: "jane@example.com", role: "customer" });
+    const body = sentBody();
+    expect(body.to).toBe("admin@skyvaultuk.com");
+    expect(body.subject).toBe("New SkyVault user — SkyVault");
+    expect(body.html).toContain("Jane");
+    expect(body.html).toContain("jane@example.com");
+    expect(body.html).toContain("Role: customer");
+    expect(body.html).toContain('href="https://app.example/admin/users"');
+  });
+
+  it("says (no name yet) for an email-link account with no name", async () => {
+    await notifyAdminNewUser({ to: "admin@skyvaultuk.com", name: null, email: "sam@example.com", role: "customer" });
+    expect(sentBody().html).toContain("(no name yet)");
+  });
+});
+
+describe("notifyAdminReportWaiting (BL-084 / SPEC-032 B1)", () => {
+  const BASE_REPORT = {
+    to: "admin@skyvaultuk.com", reportId: "rep-1", address: "12 High Street", postcode: "TQ9 5QH",
+    customer: "Jane", conditionScore: 6, urgent: false,
+  };
+
+  it("gives the property, customer, score and a Review link, with no personal data in the subject", async () => {
+    await notifyAdminReportWaiting(BASE_REPORT);
+    const body = sentBody();
+    expect(body.subject).toBe("Report waiting for your approval — SkyVault");
+    expect(body.html).toContain("12 High Street, TQ9 5QH");
+    expect(body.html).toContain("Customer: Jane");
+    expect(body.html).toContain("Condition score: 6/10");
+    expect(body.html).toContain('href="https://app.example/admin/reports/rep-1"');
+    expect(body.html).not.toContain("Urgent action flagged");
+  });
+
+  it("says Urgent action flagged only when the analysis flagged it", async () => {
+    await notifyAdminReportWaiting({ ...BASE_REPORT, urgent: true });
+    expect(sentBody().html).toContain("Urgent action flagged");
   });
 });
