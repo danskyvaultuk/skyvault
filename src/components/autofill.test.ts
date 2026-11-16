@@ -9,7 +9,7 @@ describe("autofill hints (BL-078 / SPEC-027 D2)", () => {
   });
 
   it("the register name and email fields ask for the name and email", () => {
-    const page = read("src/app/(auth)/register/page.tsx");
+    const page = read("src/app/(auth)/register/register-form.tsx");
     expect(page).toContain('autoComplete="name"');
     expect(page).toMatch(/type="email"\s+autoComplete="email"/);
   });

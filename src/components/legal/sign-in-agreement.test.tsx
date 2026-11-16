@@ -12,7 +12,7 @@ describe("SignInAgreement (BL-057 / SPEC-024 D1)", () => {
     expect(html).toContain('href="/privacy"');
   });
 
-  it.each([["login", "src/app/(auth)/login/page.tsx"], ["register", "src/app/(auth)/register/page.tsx"]])(
+  it.each([["login", "src/app/(auth)/login/page.tsx"], ["register", "src/app/(auth)/register/register-form.tsx"]])(
     "is shown on the %s page",
     (_name, path) => {
       const page = readFileSync(path, "utf8");
