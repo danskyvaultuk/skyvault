@@ -5,6 +5,7 @@ import Resend from "next-auth/providers/resend";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
 import { refreshSessionToken } from "@/lib/sessionRole";
+import { alertNewUser } from "@/lib/adminAlerts";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -27,6 +28,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: {
     // JWT strategy lets the Credentials provider work alongside the database adapter
     strategy: "jwt",
+  },
+  events: {
+    // A first sign-in, by Google or email link, creates the account: tell the
+    // admin (BL-084 / SPEC-032 A1). alertNewUser never throws.
+    async createUser({ user }) {
+      await alertNewUser({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: (user as { role?: string }).role,
+      });
+    },
   },
   callbacks: {
     async signIn({ user }) {

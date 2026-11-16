@@ -14,6 +14,7 @@ const mockAnalyzeRoof = vi.fn();
 const mockUploadBuffer = vi.fn();
 const mockDistributeLeads = vi.fn();
 const mockNotifyCustomer = vi.fn();
+const mockNotifyAdminWaiting = vi.fn();
 const mockRenderReportPDF = vi.fn();
 const switches = { droneEnabled: false, rooferEnabled: false };
 // Reports kept only when the transaction that wrote them finishes (BL-066).
@@ -69,6 +70,7 @@ vi.mock("@/lib/journeys", () => ({ journeys: switches }));
 
 vi.mock("@/lib/resend", () => ({
   notifyCustomerReportReady: (...args: unknown[]) => mockNotifyCustomer(...args),
+  notifyAdminReportWaiting: (...args: unknown[]) => mockNotifyAdminWaiting(...args),
 }));
 
 vi.mock("sharp", () => ({
@@ -133,6 +135,7 @@ beforeEach(() => {
   mockDistributeLeads.mockReset().mockResolvedValue({ id: "lead-1" });
   switches.rooferEnabled = false;
   mockNotifyCustomer.mockReset().mockResolvedValue(undefined);
+  mockNotifyAdminWaiting.mockReset().mockResolvedValue(undefined);
   mockRenderReportPDF.mockReset().mockResolvedValue(Buffer.from("fake-pdf"));
 });
 
@@ -349,5 +352,54 @@ describe("runAnalysisPipeline — shortened AI text is what gets stored (BL-079 
     expect(saved.rawAiResponse.review_flags[0].description).toBe(shortened);
     // The PDF is drawn from the same checked analysis.
     expect(mockRenderReportPDF.mock.calls[0][0].defects[0].description).toBe(shortened);
+  });
+});
+
+describe("runAnalysisPipeline — the admin's report waiting alert (BL-084 / SPEC-032 B1–B3, C2)", () => {
+  it("B1: after saving a held report, emails the admin its property, customer, score, urgency and report id", async () => {
+    mockAnalyzeRoof.mockResolvedValue({ ...VALID_ANALYSIS, condition_score: 4, urgent_action_required: true });
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+    await runAnalysisPipeline("survey-1");
+    expect(mockNotifyAdminWaiting).toHaveBeenCalledTimes(1);
+    expect(mockNotifyAdminWaiting).toHaveBeenCalledWith({
+      to: "dan@skyvaultuk.com", reportId: "report-1", address: "1 Test St", postcode: "SW1A 1AA",
+      customer: "Test", conditionScore: 4, urgent: true,
+    });
+    // Only after the report is saved.
+    expect(mockReportCreate.mock.invocationCallOrder[0]).toBeLessThan(mockNotifyAdminWaiting.mock.invocationCallOrder[0]);
+  });
+
+  it("B1: names the customer by email when they have no name", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}], { customer: { email: "sam@example.com", name: null } }));
+    await runAnalysisPipeline("survey-1");
+    expect(mockNotifyAdminWaiting.mock.calls[0][0].customer).toBe("sam@example.com");
+  });
+
+  it("B2: a second analysis of the same survey sends a second alert", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+    await runAnalysisPipeline("survey-1");
+    await runAnalysisPipeline("survey-1");
+    expect(mockNotifyAdminWaiting).toHaveBeenCalledTimes(2);
+  });
+
+  it("B3: a failed analysis sends no alert", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+    mockAnalyzeRoof.mockRejectedValue(new Error("Claude is down"));
+    await expect(runAnalysisPipeline("survey-1")).rejects.toThrow();
+    expect(mockNotifyAdminWaiting).not.toHaveBeenCalled();
+  });
+
+  it("C2: a failing alert leaves the analysis succeeding, with the report saved", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+    mockNotifyAdminWaiting.mockRejectedValue(new Error("email provider down"));
+    const report = await runAnalysisPipeline("survey-1");
+    expect(report).toMatchObject({ id: "report-1" });
+    expect(mockSurveyUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ data: { status: "failed" } }));
+  });
+
+  it("still sends the customer nothing until approval", async () => {
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+    await runAnalysisPipeline("survey-1");
+    expect(mockNotifyCustomer).not.toHaveBeenCalled();
   });
 });
