@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { DESCRIPTION_LIMIT, LOCATION_LIMIT, shortenedText } from "@/lib/textLimits";
 import { buildRoofContextPromptBlock, type RoofContext } from "@/lib/roofContext";
 import { buildPhotoLabelsBlock, type RoofPart } from "@/lib/photoTag";
 import { applyScoreCaps, rubricPromptSection } from "@/lib/scoringRubric";
@@ -17,14 +18,15 @@ const DefectSchema = z.object({
     "gutter_damage", "ridge_damage", "valley_damage", "other",
   ]),
   severity: z.enum(["low", "medium", "high", "critical"]),
-  description: z.string().max(150),
+  // BL-079: generous limits, shortened rather than refused (src/lib/textLimits.ts).
+  description: shortenedText(DESCRIPTION_LIMIT),
   image_index: z.number().int().min(0),
   // BL-009: how soon to act, whether it affects how the roof works, how much of
   // the roof it covers, and where in the photo it is (never a measured slope, ADR-008).
   priority: z.enum(["low", "medium", "high", "urgent"]),
   category: z.enum(["cosmetic", "functional"]),
   extent: z.enum(["small", "moderate", "large"]),
-  location: z.string().max(120),
+  location: shortenedText(LOCATION_LIMIT),
   // BL-004: the peripheral zone the defect is in, or "none".
   zone: z.enum(DEFECT_ZONES),
 });

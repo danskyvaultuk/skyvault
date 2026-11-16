@@ -320,3 +320,49 @@ describe("analyzeRoof — the analysis model (BL-067)", () => {
     await expect(analyzeRoof(["a"], ["image/jpeg"])).rejects.toThrow(/max_tokens/);
   });
 });
+
+describe("analyzeRoof — over-long text (BL-079 / SPEC-026)", () => {
+  const words = (n: number) => "Lichen patches across the main slate slope, slates intact beneath it ".repeat(10).slice(0, n);
+  const withDefect = (over: Record<string, unknown>, flags: unknown[] = []) => ({
+    ...VALID_RESPONSE_JSON,
+    defects: [{ ...VALID_RESPONSE_JSON.defects[0], ...over }],
+    review_flags: flags,
+  });
+  const analyse = () => analyzeRoof(["a"], ["image/jpeg"], undefined, null);
+
+  it("A1: returns 151- and 300-character descriptions and a 121-character location unchanged", async () => {
+    for (const description of [words(151), words(300)]) {
+      mockClaudeReturns(withDefect({ description, location: words(121) }));
+      const result = await analyse();
+      expect(result.defects[0].description).toBe(description);
+      expect(result.defects[0].location).toBe(words(121));
+    }
+  });
+
+  it("A2/A3: shortens a 400-character description, a 300-character location and a 400-character review flag instead of failing", async () => {
+    mockClaudeReturns(
+      withDefect({ description: words(400), location: words(300) }, [{ reason: "ambiguous", description: words(400), image_index: 0 }])
+    );
+    const result = await analyse();
+    const [defect] = result.defects;
+    const [flag] = result.review_flags;
+    expect(defect.description.length).toBeLessThanOrEqual(300);
+    expect(defect.location.length).toBeLessThanOrEqual(240);
+    expect(flag.description.length).toBeLessThanOrEqual(300);
+    for (const text of [defect.description, defect.location, flag.description]) {
+      expect(text.endsWith("…")).toBe(true);
+      expect(text.startsWith("Lichen patches across the main slate slope")).toBe(true);
+    }
+  });
+
+  it("B1: still refuses an unknown defect type", async () => {
+    mockClaudeReturns(withDefect({ type: "alien_damage" }));
+    await expect(analyse()).rejects.toThrow("Claude response failed validation");
+  });
+
+  it("B1: still refuses an answer with no condition score", async () => {
+    const { condition_score: _omit, ...noScore } = VALID_RESPONSE_JSON;
+    mockClaudeReturns(noScore);
+    await expect(analyse()).rejects.toThrow("Claude response failed validation");
+  });
+});

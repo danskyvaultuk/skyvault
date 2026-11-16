@@ -3,6 +3,7 @@
 // tells the admin what to look at. The customer sees only the areas that could
 // not be assessed. Flags live in the stored AI answer; nobody edits them.
 import { z } from "zod";
+import { DESCRIPTION_LIMIT, shortenedText } from "@/lib/textLimits";
 
 export const REVIEW_FLAG_REASONS = ["low_confidence", "ambiguous", "unassessable_area", "low_light"] as const;
 
@@ -17,7 +18,7 @@ export const REVIEW_FLAG_LABELS: Record<ReviewFlagReason, string> = {
 
 export const ReviewFlagSchema = z.object({
   reason: z.enum(REVIEW_FLAG_REASONS),
-  description: z.string().max(150),
+  description: shortenedText(DESCRIPTION_LIMIT), // BL-079
   image_index: z.number().int().min(0).nullable(),
 });
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DESCRIPTION_LIMIT, LOCATION_LIMIT } from "@/lib/textLimits";
 import {
   DEFECT_CATEGORIES,
   DEFECT_EXTENTS,
@@ -70,11 +71,11 @@ function DefectRow({
         <OptionalSelect label="Zone" value={defect.zone} options={DEFECT_ZONES} onChange={(zone) => onChange({ ...defect, zone })} />
       </div>
       <input
-        className={`${INPUT} w-full`} maxLength={150} placeholder="Description (up to 150 characters)"
+        className={`${INPUT} w-full`} maxLength={DESCRIPTION_LIMIT} placeholder={`Description (up to ${DESCRIPTION_LIMIT} characters)`}
         value={defect.description} onChange={(e) => onChange({ ...defect, description: e.target.value })}
       />
       <input
-        className={`${INPUT} w-full`} maxLength={120} placeholder="Where in the photo, e.g. lower left, near the gutter (up to 120 characters)"
+        className={`${INPUT} w-full`} maxLength={LOCATION_LIMIT} placeholder={`Where in the photo, e.g. lower left, near the gutter (up to ${LOCATION_LIMIT} characters)`}
         value={defect.location ?? ""} onChange={(e) => onChange({ ...defect, location: e.target.value || undefined })}
       />
     </div>
