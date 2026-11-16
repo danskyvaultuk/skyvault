@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { reviewFailureMessage } from "@/lib/reviewFailureMessage";
 import { DESCRIPTION_LIMIT, LOCATION_LIMIT } from "@/lib/textLimits";
 import {
   DEFECT_CATEGORIES,
@@ -97,7 +98,7 @@ export function ReviewForm({ reportId, held, photoCount, initial }: Props) {
     const res = await fetch(url, init).catch(() => null);
     setBusy(false);
     if (!res?.ok) {
-      setMessage({ ok: false, text: res?.status === 400 ? "Please check the values: something is not valid." : "That didn't work. Please try again." });
+      setMessage({ ok: false, text: reviewFailureMessage(res?.status ?? null) });
       return;
     }
     setMessage({ ok: true, text: done });
