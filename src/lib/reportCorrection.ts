@@ -1,8 +1,9 @@
 // What an admin may change on a report (BL-015 / BL-061). Client-safe: the
-// review form imports the lists below, so this module imports only zod and the
-// import-free zone list.
+// review form imports the lists below, so this module imports only zod, the
+// import-free zone list and the zod-only text limits.
 import { z } from "zod";
 import { DEFECT_ZONES } from "@/lib/peripheralZones";
+import { DESCRIPTION_LIMIT, LOCATION_LIMIT } from "@/lib/textLimits";
 
 export { DEFECT_ZONES };
 
@@ -19,13 +20,14 @@ export const DEFECT_EXTENTS = ["small", "moderate", "large"] as const;
 export const CorrectedDefectSchema = z.object({
   type: z.enum(DEFECT_TYPES),
   severity: z.enum(DEFECT_SEVERITIES),
-  description: z.string().trim().min(1).max(150),
+  // BL-079: the same limits the analysis accepts, so a stored report loads; still strict for the admin.
+  description: z.string().trim().min(1).max(DESCRIPTION_LIMIT),
   image_index: z.number().int().min(0),
   // BL-009. Optional, because reports made before BL-009 have none of these.
   priority: z.enum(DEFECT_PRIORITIES).optional(),
   category: z.enum(DEFECT_CATEGORIES).optional(),
   extent: z.enum(DEFECT_EXTENTS).optional(),
-  location: z.string().trim().max(120).optional(),
+  location: z.string().trim().max(LOCATION_LIMIT).optional(),
   // BL-004. Optional, because reports made before BL-004 have none.
   zone: z.enum(DEFECT_ZONES).optional(),
 });

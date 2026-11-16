@@ -18,9 +18,16 @@ describe("ReviewFlagSchema", () => {
     expect(ReviewFlagSchema.safeParse(UNSEEN).success).toBe(true);
   });
 
-  it("refuses an unknown reason and an over-long description", () => {
+  it("refuses an unknown reason", () => {
     expect(ReviewFlagSchema.safeParse({ ...SHADOW, reason: "bored" }).success).toBe(false);
-    expect(ReviewFlagSchema.safeParse({ ...SHADOW, description: "x".repeat(151) }).success).toBe(false);
+  });
+
+  it("accepts a description up to 300 characters unchanged, and shortens a longer one (BL-079 / SPEC-026)", () => {
+    const upTo = ReviewFlagSchema.parse({ ...SHADOW, description: "x".repeat(300) });
+    expect(upTo.description).toBe("x".repeat(300));
+    const longer = ReviewFlagSchema.parse({ ...SHADOW, description: "word ".repeat(80).trim() });
+    expect(longer.description.length).toBeLessThanOrEqual(300);
+    expect(longer.description.endsWith("…")).toBe(true);
   });
 });
 
