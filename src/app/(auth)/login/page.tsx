@@ -38,7 +38,8 @@ return (
 
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold text-blue-700">SkyVault</h1>
-          <p className="mt-2 text-gray-600">Sign in to your account</p>
+          <p className="mt-2 text-lg font-semibold text-gray-900">Sign in or create an account</p>
+          <p className="mt-1 text-sm text-gray-500">New to SkyVault? No separate sign-up: your first sign-in creates your account.</p>
         </div>
 
         {magicSent ? (
@@ -106,12 +107,11 @@ return (
             <SignInAgreement />
 
 
+            {/* Customers need no sign-up (BL-081 / SPEC-030 A2); roofer and drone sign-up follow their switches. */}
+            {(journeys.rooferEnabled || journeys.droneEnabled) && (
             <div className="mt-6 pt-6 border-t text-center">
-              <p className="text-sm text-gray-500 mb-3">Don&apos;t have an account?</p>
+              <p className="text-sm text-gray-500 mb-3">Joining as a professional?</p>
               <div className="flex flex-col gap-2">
-                <Link href="/register?role=customer" className="w-full border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 text-center">
-                  🏠 Sign up as a homeowner
-                </Link>
                 {journeys.rooferEnabled && (
                   <Link href="/register?role=roofer" className="w-full border border-gray-300 text-gray-700 rounded-lg py-2 text-sm font-medium hover:bg-gray-50 text-center">
                     🔨 Sign up as a roofer
@@ -124,6 +124,7 @@ return (
                 )}
               </div>
             </div>
+            )}
           </>
         )}
 

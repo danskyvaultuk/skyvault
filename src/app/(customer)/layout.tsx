@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { MobileNav } from "@/components/mobile-nav";
 import { journeys } from "@/lib/journeys";
 import { SignOutButton } from "@/components/sign-out-button";
+import { NameStep } from "@/components/name-step";
+import { prisma } from "@/lib/prisma";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard" },
@@ -16,6 +18,11 @@ const nav = [
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session) redirect("/login");
+
+  // A customer with no name saved (an email-link sign-up) is asked once, on the
+  // page they asked for, before seeing it (BL-081 / SPEC-030 B1, B3).
+  const stored = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
+  const needsName = session.user.role === "customer" && !stored?.name?.trim();
 
   // Phones get one header, the menu bar, with the email and Sign out inside the
   // menu; the page scrolls as a whole, with no inner scroll box (BL-078 / SPEC-027 C1, C2).
@@ -41,7 +48,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
             <p className="text-sm text-gray-500 truncate max-w-[180px]">{session.user?.email}</p>
             <SignOutButton className="text-sm font-medium text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg whitespace-nowrap" />
           </header>
-          <main className="flex-1 bg-gray-50">{children}</main>
+          <main className="flex-1 bg-gray-50">{needsName ? <NameStep /> : children}</main>
         </div>
       </div>
     </div>
