@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ROOF_PARTS, type RoofPart } from "@/lib/photoTag";
 import { checkUploadedPhoto } from "@/lib/uploadCheck";
+import { isIssuedPhotoKey } from "@/lib/photoKeys";
 
 const MAX_IMAGES = 10;
 
@@ -15,6 +16,16 @@ const registerSchema = z.object({
   // A photo uploaded under a checklist item arrives labelled with its roof parts (BL-021).
   roofParts: z.array(z.enum(ROOF_PARTS)).max(ROOF_PARTS.length).optional(),
 });
+
+// Only a key SkyVault issued for this survey is signed, checked or stored
+// (BL-064 / SPEC-028 A1); any other is refused before anything touches storage.
+function registrationSchema(surveyId: string) {
+  return registerSchema.extend({
+    s3Key: z.string().refine((key) => isIssuedPhotoKey(surveyId, key), {
+      message: "This photo's upload address isn't valid for this survey. Please upload it again.",
+    }),
+  });
+}
 
 // A checklist upload is saved labelled, with the time it was labelled (BL-021).
 function checklistLabel(roofParts: RoofPart[] | undefined) {
@@ -85,7 +96,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (refusal) return refusal;
 
   const body = await req.json();
-  const parsed = registerSchema.safeParse(body);
+  const parsed = registrationSchema(surveyId).safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   // Too small or too blurry: not saved, and the customer is told how to retake it (BL-018).

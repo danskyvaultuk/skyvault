@@ -26,11 +26,14 @@ const { GET } = await import("./route");
 const ACCEPTED = { outcome: "accepted", width: 4032, height: 3024, sharpness: 312.5 };
 const mockFetch = vi.fn();
 
+// A key as the presign route issues it for survey-1 (BL-064 / SPEC-028).
+const ISSUED_KEY = "surveys/survey-1/images/3f2b8c1e-9d4a-4b7e-8c21-5a6f0e9d1b23.jpg";
+
 function register(body: Record<string, unknown>) {
   return POST(
     new Request("http://localhost/api/surveys/survey-1/images", {
       method: "POST",
-      body: JSON.stringify({ s3Key: "surveys/survey-1/images/a.jpg", originalFilename: "a.jpg", ...body }),
+      body: JSON.stringify({ s3Key: ISSUED_KEY, originalFilename: "a.jpg", ...body }),
     }),
     { params: Promise.resolve({ id: "survey-1" }) }
   );
@@ -226,5 +229,30 @@ describe("POST /api/surveys/[id]/images — server-enforced limits (BL-066)", ()
     mockSurveyFindUnique.mockResolvedValue({ id: "survey-1", customerId: "cust-1", droneJob: null, _count: { images: 9 } });
     const res = await register({});
     expect(res.status).toBe(201);
+  });
+});
+
+describe("POST /api/surveys/[id]/images — only keys issued for this survey (BL-064 / SPEC-028 A1, A2)", () => {
+  const UUID = "3f2b8c1e-9d4a-4b7e-8c21-5a6f0e9d1b23";
+
+  it("A2: accepts a key issued for this survey", async () => {
+    const res = await register({ s3Key: ISSUED_KEY });
+    expect(res.status).toBe(201);
+    expect(mockImageCreate.mock.calls[0][0].data.s3Key).toBe(ISSUED_KEY);
+  });
+
+  it.each([
+    ["another survey's photo", `surveys/survey-2/images/${UUID}.jpg`],
+    ["a key outside surveys/", `private/${UUID}.jpg`],
+    ["the survey's report PDF", "surveys/survey-1/report.pdf"],
+    ["a path climbing out with ..", `surveys/survey-1/images/../../survey-2/images/${UUID}.jpg`],
+    ["an extra folder", `surveys/survey-1/images/x/${UUID}.jpg`],
+    ["something appended", `${ISSUED_KEY}/extra`],
+  ])("A1: refuses %s with 400, without checking, signing or saving anything", async (_what, s3Key) => {
+    const res = await register({ s3Key });
+    expect(res.status).toBe(400);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockAssess).not.toHaveBeenCalled();
+    expect(mockImageCreate).not.toHaveBeenCalled();
   });
 });
