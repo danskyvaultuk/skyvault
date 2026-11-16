@@ -38,7 +38,7 @@ export default function NewPropertyPage() {
   }
 
   return (
-    <div className="p-8 max-w-lg">
+    <div className="p-4 md:p-8 max-w-lg">
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Add property</h1>
 
       <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 space-y-5">

@@ -177,7 +177,7 @@ export default async function CustomerDashboard() {
 
       {/* Properties list (when not new user but no surveys yet) */}
       {!isNewUser && recentSurveys.length === 0 && (
-        <div className="bg-white border rounded-xl p-8 text-center mb-8">
+        <div className="bg-white border rounded-xl p-4 md:p-8 text-center mb-8">
           <p className="text-gray-600 mb-4">No surveys yet. Start one to get your first roof report.</p>
           <Link
             href="/surveys/new"

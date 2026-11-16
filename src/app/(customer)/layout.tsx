@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { MobileNav } from "@/components/mobile-nav";
 import { journeys } from "@/lib/journeys";
+import { SignOutButton } from "@/components/sign-out-button";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard" },
@@ -16,11 +17,13 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const session = await auth();
   if (!session) redirect("/login");
 
+  // Phones get one header, the menu bar, with the email and Sign out inside the
+  // menu; the page scrolls as a whole, with no inner scroll box (BL-078 / SPEC-027 C1, C2).
   return (
     <div className="min-h-screen flex flex-col">
-      <MobileNav nav={nav} title="SkyVault" homeHref="/dashboard" />
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="hidden md:flex w-56 bg-white border-r flex-col shrink-0">
+      <MobileNav nav={nav} title="SkyVault" homeHref="/dashboard" account={{ email: session.user?.email ?? "" }} />
+      <div className="flex flex-1">
+        <aside className="hidden md:flex w-56 bg-white border-r flex-col shrink-0 sticky top-0 h-screen">
           <div className="px-6 py-5 border-b">
             <Link href="/dashboard" className="text-lg font-bold text-blue-700">SkyVault</Link>
           </div>
@@ -34,14 +37,11 @@ export default async function CustomerLayout({ children }: { children: React.Rea
           </nav>
         </aside>
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="bg-white border-b px-4 md:px-6 py-3 flex items-center justify-end gap-4">
-            <p className="text-sm text-gray-500 hidden sm:block truncate max-w-[180px]">{session.user?.email}</p>
-            <Link href="/api/auth/signout"
-              className="text-sm font-medium text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg whitespace-nowrap">
-              Sign out
-            </Link>
+          <header className="hidden md:flex bg-white border-b px-6 py-3 items-center justify-end gap-4" data-testid="desktop-header">
+            <p className="text-sm text-gray-500 truncate max-w-[180px]">{session.user?.email}</p>
+            <SignOutButton className="text-sm font-medium text-white bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded-lg whitespace-nowrap" />
           </header>
-          <main className="flex-1 overflow-auto bg-gray-50">{children}</main>
+          <main className="flex-1 bg-gray-50">{children}</main>
         </div>
       </div>
     </div>

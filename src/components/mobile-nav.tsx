@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { SignOutButton } from "@/components/sign-out-button";
 
 interface NavItem { href: string; label: string; }
 
@@ -11,15 +12,17 @@ interface MobileNavProps {
   subtitle?: string;
   homeHref: string;
   variant?: "light" | "dark";
+  /** The signed-in user, shown with Sign out in the menu (BL-078 / SPEC-027 C1). */
+  account?: { email: string };
 }
 
-export function MobileNav({ nav, title, subtitle, homeHref, variant = "light" }: MobileNavProps) {
+export function MobileNav({ nav, title, subtitle, homeHref, variant = "light", account }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const dark = variant === "dark";
 
   return (
     <>
-      <div className={`md:hidden flex items-center justify-between px-4 py-3 border-b shrink-0 ${dark ? "bg-gray-900 border-gray-700" : "bg-white"}`}>
+      <div className={`md:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 border-b shrink-0 ${dark ? "bg-gray-900 border-gray-700" : "bg-white"}`}>
         <Link href={homeHref} className={`text-lg font-bold ${dark ? "text-blue-400" : "text-blue-700"}`}>
           {title}
           {subtitle && <span className={`block text-xs font-normal ${dark ? "text-gray-400" : "text-gray-500"}`}>{subtitle}</span>}
@@ -35,8 +38,8 @@ export function MobileNav({ nav, title, subtitle, homeHref, variant = "light" }:
         </button>
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-50 md:hidden">
+      {/* Always in the page, hidden until opened. */}
+      <div className={open ? "fixed inset-0 z-50 md:hidden" : "hidden"} data-testid="mobile-menu">
           <div className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} />
           <div className={`absolute left-0 top-0 bottom-0 w-64 flex flex-col ${dark ? "bg-gray-900" : "bg-white"}`}>
             <div className={`px-6 py-5 border-b flex items-center justify-between ${dark ? "border-gray-700" : ""}`}>
@@ -64,9 +67,14 @@ export function MobileNav({ nav, title, subtitle, homeHref, variant = "light" }:
                 </Link>
               ))}
             </nav>
+            {account && (
+              <div className={`px-6 py-4 border-t space-y-3 ${dark ? "border-gray-700" : ""}`}>
+                <p className={`text-sm truncate ${dark ? "text-gray-400" : "text-gray-500"}`}>{account.email}</p>
+                <SignOutButton className="w-full min-h-[44px] text-sm font-medium text-white bg-gray-800 hover:bg-gray-700 rounded-lg" />
+              </div>
+            )}
           </div>
         </div>
-      )}
     </>
   );
 }

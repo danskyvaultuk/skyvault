@@ -57,3 +57,12 @@ describe("AddressFinder (BL-074 / SPEC-022 Part B)", () => {
     expect(html).toContain('id="address-street"');
   });
 });
+
+describe("AddressFinder autofill hints (BL-078 / SPEC-027 D2)", () => {
+  it("the street, town and postcode fields carry their autofill hints", () => {
+    const html = render(addressFinderReducer(initialAddressFinder, { type: "enter-by-hand" }));
+    expect(html).toMatch(/id="address-street"[^>]*autoComplete="address-line1"|autoComplete="address-line1"[^>]*id="address-street"/i);
+    expect(html).toMatch(/id="address-postcode"[^>]*autoComplete="postal-code"|autoComplete="postal-code"[^>]*id="address-postcode"/i);
+    expect(html).toMatch(/id="address-town"[^>]*autoComplete="address-level2"|autoComplete="address-level2"[^>]*id="address-town"/i);
+  });
+});

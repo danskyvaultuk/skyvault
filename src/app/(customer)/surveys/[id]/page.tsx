@@ -138,7 +138,7 @@ export default function SurveyPage() {
 
   if (!survey) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-2" />
         <div className="h-4 w-32 bg-gray-100 rounded animate-pulse" />
       </div>
@@ -156,7 +156,7 @@ export default function SurveyPage() {
   const droneBooked = justBooked || !!survey.droneJob;
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-4 md:p-8 max-w-2xl">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">{survey.property.address}</h1>

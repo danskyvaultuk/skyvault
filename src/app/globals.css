@@ -29,3 +29,15 @@ body {
 input, textarea, select {
   color: #000000 !important;
 }
+
+/* Phones: 16px form fields, so iOS Safari does not zoom in when one is tapped
+   (BL-078 / SPEC-027 D1). This must beat the fields' own size classes such as
+   text-sm. Being outside Tailwind's layers already does that; !important makes it
+   certain for any field, whatever classes it carries. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

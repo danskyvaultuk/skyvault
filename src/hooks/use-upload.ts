@@ -1,113 +1,34 @@
 "use client";
 
-import { useState, useCallback } from "react";
+// One upload area's photos (BL-078 / SPEC-027): a thin React wrapper around
+// UploadSession, which holds the queue rules.
+import { useRef, useSyncExternalStore } from "react";
 import type { RoofPart } from "@/lib/photoTag";
+import { uploadPhoto } from "@/lib/photoUpload";
+import { UploadSession } from "@/lib/uploadSession";
 
-export interface UploadFile {
-  file: File;
-  status: "pending" | "uploading" | "done" | "error";
-  progress: number;
-  s3Key?: string;
-  error?: string;
-}
+export type { UploadEntry } from "@/lib/uploadSession";
 
-export function useUpload(surveyId: string, roofParts?: readonly RoofPart[]) {
-  const [files, setFiles] = useState<UploadFile[]>([]);
-  const [uploading, setUploading] = useState(false);
+export function useUpload(surveyId: string, roofParts?: readonly RoofPart[], onUploadComplete?: (count: number) => void) {
+  const onDrained = useRef(onUploadComplete);
+  onDrained.current = onUploadComplete;
 
-  const updateFile = (index: number, patch: Partial<UploadFile>) => {
-    setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, ...patch } : f)));
+  const session = useRef<UploadSession | null>(null);
+  session.current ??= new UploadSession({
+    upload: (file, onProgress) => uploadPhoto({ surveyId, file, roofParts, onProgress }),
+    preview: (file) => URL.createObjectURL(file),
+    onDrained: (uploaded) => onDrained.current?.(uploaded),
+  });
+  const current = session.current;
+
+  const files = useSyncExternalStore(current.subscribe, current.getSnapshot, current.getSnapshot);
+
+  return {
+    files,
+    addFiles: (incoming: File[]) => current.add(incoming),
+    retry: (id: number) => current.retry(id),
+    removeFile: (id: number) => current.remove(id),
+    uploading: files.some((f) => f.status === "pending" || f.status === "uploading"),
+    doneCount: files.filter((f) => f.status === "done").length,
   };
-
-  const addFiles = useCallback((incoming: File[]) => {
-    setFiles((prev) => [
-      ...prev,
-      ...incoming.map((file) => ({ file, status: "pending" as const, progress: 0 })),
-    ]);
-  }, []);
-
-  const uploadAll = useCallback(async (): Promise<number> => {
-    setUploading(true);
-    const pendingIndices = files
-      .map((f, i) => (f.status === "pending" ? i : -1))
-      .filter((i) => i >= 0);
-
-    const results = await Promise.all(
-      pendingIndices.map(async (index) => {
-        const { file } = files[index];
-        updateFile(index, { status: "uploading", progress: 0 });
-
-        try {
-          const presignRes = await fetch(`/api/surveys/${surveyId}/images/presign`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              filename: file.name,
-              contentType: file.type,
-              sizeBytes: file.size,
-            }),
-          });
-
-          if (!presignRes.ok) throw new Error("Failed to get upload URL");
-          const { s3Key, uploadUrl } = await presignRes.json();
-
-          await new Promise<void>((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.upload.onprogress = (e) => {
-              if (e.lengthComputable) {
-                updateFile(index, { progress: Math.round((e.loaded / e.total) * 100) });
-              }
-            };
-            xhr.onload = async () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                const registered = await fetch(`/api/surveys/${surveyId}/images`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    s3Key,
-                    originalFilename: file.name,
-                    mimeType: file.type,
-                    sizeBytes: file.size,
-                    // Labelled with its checklist item, when uploaded under one (BL-021).
-                    ...(roofParts?.length ? { roofParts } : {}),
-                  }),
-                });
-                // A photo the server refuses (too small or blurry, BL-018) is not
-                // uploaded: show its guidance on this file and count it as failed.
-                if (!registered.ok) {
-                  const refusal = await registered.json().catch(() => ({}));
-                  reject(new Error(refusal.guidance ?? refusal.error ?? "This photo couldn't be added. Please try again."));
-                  return;
-                }
-                updateFile(index, { status: "done", progress: 100, s3Key });
-                resolve();
-              } else {
-                reject(new Error(`Upload failed: ${xhr.status}`));
-              }
-            };
-            xhr.onerror = () => reject(new Error("Network error"));
-            xhr.open("PUT", uploadUrl);
-            xhr.setRequestHeader("Content-Type", file.type);
-            xhr.send(file);
-          });
-
-          return 1 as number; // successfully uploaded
-        } catch (err) {
-          updateFile(index, { status: "error", error: (err as Error).message });
-          return 0 as number;
-        }
-      })
-    );
-
-    setUploading(false);
-    return results.reduce((sum: number, n: number) => sum + n, 0);
-  }, [files, surveyId, roofParts]);
-
-  const removeFile = useCallback((index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const doneCount = files.filter((f) => f.status === "done").length;
-
-  return { files, addFiles, uploadAll, removeFile, uploading, doneCount };
 }

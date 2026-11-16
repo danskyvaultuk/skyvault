@@ -48,7 +48,7 @@ export function TapChipSelector<T extends string>({
           key={opt.value}
           type="button"
           onClick={() => handleTap(opt.value)}
-          className={`px-2.5 py-1.5 rounded-full text-xs font-medium border transition ${
+          className={`min-h-[44px] px-3 py-2 rounded-full text-sm font-medium border transition ${
             selected.includes(opt.value)
               ? "border-blue-600 bg-blue-50 text-blue-700"
               : "border-gray-200 hover:border-gray-300 text-gray-600"
@@ -61,7 +61,7 @@ export function TapChipSelector<T extends string>({
         <button
           type="button"
           onClick={onClear}
-          className="px-2.5 py-1.5 rounded-full text-xs font-medium text-gray-400 hover:text-red-500"
+          className="min-h-[44px] px-3 py-2 rounded-full text-sm font-medium text-gray-400 hover:text-red-500"
         >
           Clear
         </button>

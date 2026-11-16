@@ -59,7 +59,7 @@ export default function NewSurveyPage() {
   if (!ready) return null;
 
   return (
-    <div className="p-8 max-w-xl">
+    <div className="p-4 md:p-8 max-w-xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">New roof survey</h1>
       <p className="text-gray-500 mb-8">
         {journeys.droneEnabled
