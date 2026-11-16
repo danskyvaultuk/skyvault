@@ -8,6 +8,8 @@ const PUBLIC_PREFIXES = [
   "/terms",
   "/privacy",
   "/api/auth",
+  // The health check, loaded by an uptime monitor (BL-083 / SPEC-031 A1).
+  "/api/health",
   "/api/stripe/webhook",
   "/auth/redirect",
 ] as const;

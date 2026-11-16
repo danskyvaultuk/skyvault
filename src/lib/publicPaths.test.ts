@@ -7,6 +7,10 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/privacy")).toBe(true);
   });
 
+  it("lets an uptime monitor load the health check (BL-083 / SPEC-031 A1)", () => {
+    expect(isPublicPath("/api/health")).toBe(true);
+  });
+
   it("keeps the existing public paths public", () => {
     for (const path of ["/", "/blog", "/blog/a-post", "/login", "/register", "/verify", "/api/auth/session", "/api/stripe/webhook", "/auth/redirect"]) {
       expect(isPublicPath(path)).toBe(true);
