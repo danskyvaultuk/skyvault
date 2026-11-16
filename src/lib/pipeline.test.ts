@@ -328,3 +328,26 @@ describe("runAnalysisPipeline — report and completion saved together (BL-066 /
     expect(mockSurveyUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ data: { status: "failed" } }));
   });
 });
+
+describe("runAnalysisPipeline — shortened AI text is what gets stored (BL-079 / SPEC-026 A3)", () => {
+  it("saves and renders the checked analysis from analyzeRoof, shortened text included, never a raw answer", async () => {
+    // analyzeRoof returns the answer after its checks, with over-long text already shortened (claude.test.ts).
+    const shortened = `${"Lichen across the main slate slope ".repeat(8).trim().slice(0, 290)}…`;
+    const checked = {
+      ...VALID_ANALYSIS,
+      defects: [{ type: "moss_growth", severity: "low", description: shortened, image_index: 0, priority: "low", category: "cosmetic", extent: "moderate", location: "lower left…", zone: "none" }],
+      review_flags: [{ reason: "ambiguous", description: shortened, image_index: 0 }],
+    };
+    mockAnalyzeRoof.mockResolvedValue(checked);
+    mockSurveyFindUnique.mockResolvedValue(makeSurvey([{}]));
+
+    await runAnalysisPipeline("survey-1");
+
+    const saved = mockReportCreate.mock.calls[0][0].data;
+    // The report page and the review form read defectsJson; the review flags are read from rawAiResponse.
+    expect(saved.defectsJson[0].description).toBe(shortened);
+    expect(saved.rawAiResponse.review_flags[0].description).toBe(shortened);
+    // The PDF is drawn from the same checked analysis.
+    expect(mockRenderReportPDF.mock.calls[0][0].defects[0].description).toBe(shortened);
+  });
+});

@@ -85,3 +85,10 @@ describe("reviewFlagPromptSection", () => {
     expect(text).toMatch(/rather than (guess|classify)/);
   });
 });
+
+describe("storedReviewFlags and long text (BL-079 / SPEC-026 A3)", () => {
+  it("reads back a stored flag with a 300-character description, as the report page does", () => {
+    const flag = { reason: "unassessable_area", description: "z".repeat(300), image_index: null };
+    expect(storedReviewFlags({ review_flags: [flag] })).toEqual([flag]);
+  });
+});

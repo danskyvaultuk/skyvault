@@ -107,6 +107,7 @@ export async function runAnalysisPipeline(surveyId: string) {
         data: {
           surveyId,
           conditionScore: analysis.condition_score,
+          // The checked analysis, with any over-long text already shortened (BL-079), never the raw answer.
           defectsJson: analysis.defects,
           estimatedRemainingLife: analysis.estimated_remaining_life_years,
           recommendations: analysis.recommendations,
