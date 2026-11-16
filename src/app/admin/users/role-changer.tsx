@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const ROLES = ["customer", "roofer", "drone", "admin"] as const;
-
-export function RoleChanger({ userId, currentRole }: { userId: string; currentRole: string }) {
+// The roles on offer come from the server, which reads the journey switches (BL-080 / SPEC-029 D1).
+export function RoleChanger({ userId, currentRole, roles }: { userId: string; currentRole: string; roles: readonly string[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +30,7 @@ export function RoleChanger({ userId, currentRole }: { userId: string; currentRo
       disabled={loading}
       className="border rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
     >
-      {ROLES.map((r) => (
+      {roles.map((r) => (
         <option key={r} value={r}>{r}</option>
       ))}
     </select>

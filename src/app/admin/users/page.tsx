@@ -2,6 +2,8 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { RoleChanger } from "./role-changer";
+import { journeys } from "@/lib/journeys";
+import { offeredRoles } from "@/lib/adminRoles";
 import { DeleteButton } from "./delete-button";
 import { ImpersonateButton } from "./impersonate-button";
 
@@ -59,7 +61,7 @@ export default async function AdminUsersPage() {
                   {new Date(u.createdAt).toLocaleDateString("en-GB")}
                 </td>
                 <td className="px-5 py-3">
-                  <RoleChanger userId={u.id} currentRole={u.role} />
+                  <RoleChanger userId={u.id} currentRole={u.role} roles={offeredRoles(journeys, u.role)} />
                 </td>
                 <td className="px-5 py-3">
                   <ImpersonateButton userId={u.id} />

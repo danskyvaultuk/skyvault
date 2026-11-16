@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { reviewStatus } from "@/lib/reviewStatus";
+import { journeys } from "@/lib/journeys";
 
 const STATUS_COLOURS: Record<string, string> = {
   draft:     "bg-gray-100 text-gray-600",
@@ -37,7 +38,8 @@ export default async function AdminSurveysPage() {
             <tr className="border-b bg-gray-50">
               <th className="text-left px-5 py-3 font-medium text-gray-600">Property</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Customer</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Type</th>
+              {/* Every launch survey is self-upload; the type matters only with the drone journey on (BL-080 / SPEC-029 D2). */}
+              {journeys.droneEnabled && <th className="text-left px-5 py-3 font-medium text-gray-600">Type</th>}
               <th className="text-left px-5 py-3 font-medium text-gray-600">Images</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Score</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Status</th>
@@ -56,9 +58,11 @@ export default async function AdminSurveysPage() {
                   <p className="text-gray-900">{s.customer.name ?? "—"}</p>
                   <p className="text-gray-400 text-xs">{s.customer.email}</p>
                 </td>
-                <td className="px-5 py-3 text-gray-600 capitalize">
-                  {s.type.replace("_", " ")}
-                </td>
+                {journeys.droneEnabled && (
+                  <td className="px-5 py-3 text-gray-600 capitalize">
+                    {s.type.replace("_", " ")}
+                  </td>
+                )}
                 <td className="px-5 py-3 text-gray-600">{s._count.images}</td>
                 <td className="px-5 py-3 font-semibold text-gray-900">
                   {s.report ? `${s.report.conditionScore}/10` : "—"}
@@ -78,7 +82,7 @@ export default async function AdminSurveysPage() {
             ))}
             {surveys.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-10 text-center text-gray-400">
+                <td colSpan={journeys.droneEnabled ? 8 : 7} className="px-5 py-10 text-center text-gray-400">
                   No surveys yet.
                 </td>
               </tr>
