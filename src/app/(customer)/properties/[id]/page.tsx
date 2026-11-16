@@ -29,7 +29,7 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
   if (!property || property.ownerId !== session!.user.id) notFound();
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-4 md:p-8 max-w-2xl">
       {/* Back */}
       <Link href="/properties" className="text-sm text-blue-600 hover:underline mb-6 inline-block">
         ← Properties
@@ -58,7 +58,7 @@ export default async function PropertyPage({ params }: { params: Promise<{ id: s
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Surveys</h2>
 
       {property.surveys.length === 0 ? (
-        <div className="bg-white border rounded-xl p-8 text-center text-gray-500">
+        <div className="bg-white border rounded-xl p-4 md:p-8 text-center text-gray-500">
           No surveys yet for this property.
         </div>
       ) : (

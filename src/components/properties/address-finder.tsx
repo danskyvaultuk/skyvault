@@ -21,16 +21,16 @@ function AddressFieldsBlock({ fields, onEditField }: Pick<Props, "onEditField"> 
     <div className="space-y-4">
       <div>
         <label htmlFor="address-street" className={LABEL}>Street address</label>
-        <input id="address-street" value={fields.address} onChange={(e) => onEditField("address", e.target.value)} required placeholder="e.g. 12 High Street" className={INPUT} />
+        <input id="address-street" autoComplete="address-line1" value={fields.address} onChange={(e) => onEditField("address", e.target.value)} required placeholder="e.g. 12 High Street" className={INPUT} />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label htmlFor="address-postcode" className={LABEL}>Postcode</label>
-          <input id="address-postcode" value={fields.postcode} onChange={(e) => onEditField("postcode", e.target.value.toUpperCase())} required placeholder="TQ9 5QH" className={INPUT} />
+          <input id="address-postcode" autoComplete="postal-code" value={fields.postcode} onChange={(e) => onEditField("postcode", e.target.value.toUpperCase())} required placeholder="TQ9 5QH" className={INPUT} />
         </div>
         <div>
           <label htmlFor="address-town" className={LABEL}>Town / City</label>
-          <input id="address-town" value={fields.town} onChange={(e) => onEditField("town", e.target.value)} placeholder="Totnes" className={INPUT} />
+          <input id="address-town" autoComplete="address-level2" value={fields.town} onChange={(e) => onEditField("town", e.target.value)} placeholder="Totnes" className={INPUT} />
         </div>
       </div>
     </div>

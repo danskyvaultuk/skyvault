@@ -38,7 +38,7 @@ function ChecklistRow({
         <button
           type="button"
           onClick={() => onToggleNotApplicable(item.id)}
-          className="mt-2 text-xs text-gray-500 hover:text-gray-700 hover:underline"
+          className="mt-2 min-h-[44px] px-1 text-sm text-gray-600 hover:text-gray-800 hover:underline"
         >
           {state === "not-applicable" ? "Actually, I can add this" : "Not applicable to my roof"}
         </button>

@@ -42,3 +42,10 @@ describe("PhotoChecklist — side slopes and other roof parts (BL-076 / SPEC-023
     expect(html).toContain("Actually, I can add this");
   });
 });
+
+describe("PhotoChecklist tap targets (BL-078 / SPEC-027 E1)", () => {
+  it("the not-applicable toggle is at least 44px tall, either way round", () => {
+    expect(render()).toMatch(/<button[^>]*min-h-\[44px\][^>]*>Not applicable to my roof<\/button>/);
+    expect(render(["side_slopes"])).toMatch(/<button[^>]*min-h-\[44px\][^>]*>Actually, I can add this<\/button>/);
+  });
+});

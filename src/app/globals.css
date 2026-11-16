@@ -29,3 +29,13 @@ body {
 input, textarea, select {
   color: #000000 !important;
 }
+
+/* Phones: 16px form fields, so iOS Safari does not zoom in when one is tapped
+   (BL-078 / SPEC-027 D1). */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

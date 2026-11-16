@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SignOutButton } from "@/components/sign-out-button";
 
 // Launch scope (BL-058): where a roofer or drone account lands while its
 // journey is switched off. Middleware sends it here from every signed-in page.
@@ -12,12 +12,7 @@ export default function UnavailablePage() {
           This part of SkyVault is not available at the moment. Your account and its details are kept safe, and
           we&apos;ll be in touch when it opens again.
         </p>
-        <Link
-          href="/api/auth/signout"
-          className="inline-block text-sm font-medium text-white bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg"
-        >
-          Sign out
-        </Link>
+        <SignOutButton className="inline-block text-sm font-medium text-white bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg" />
       </div>
     </div>
   );

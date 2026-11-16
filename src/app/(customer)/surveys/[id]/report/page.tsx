@@ -37,7 +37,7 @@ function ScoreGauge({ score }: { score: number }) {
 
 function BeingCheckedNotice({ surveyId }: { surveyId: string }) {
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 md:p-8 max-w-3xl">
       <Link href={`/surveys/${surveyId}`} className="text-sm text-blue-600 hover:underline mb-6 inline-block">
         ← Back to survey
       </Link>
@@ -102,7 +102,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
     : null;
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className="p-4 md:p-8 max-w-3xl">
       {/* An admin always sees it is the customer's view, with a way back (BL-070). */}
       {isAdmin && <AdminViewBar reportId={report.id} held={!released} />}
 
