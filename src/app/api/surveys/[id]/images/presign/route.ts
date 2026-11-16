@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { generateS3Key, getPresignedUploadUrl } from "@/lib/r2";
+import { getPresignedUploadUrl } from "@/lib/r2";
+import { issuePhotoKey } from "@/lib/photoKeys";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
 const MAX_IMAGES = 10;
@@ -47,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Only JPEG, PNG and WebP images are allowed" }, { status: 400 });
   }
 
-  const s3Key = generateS3Key(surveyId, filename);
+  const s3Key = issuePhotoKey(surveyId, filename);
   const uploadUrl = await getPresignedUploadUrl(s3Key, contentType);
 
   return NextResponse.json({ s3Key, uploadUrl, sizeBytes });
