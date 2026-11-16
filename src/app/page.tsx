@@ -11,7 +11,7 @@ import { blogPosts } from "@/data/blogPosts";
 function PlanCard({ plan }: { plan: Plan }) {
   const tone = plan.featured
     ? { card: "bg-blue-700 rounded-xl p-8 text-white", note: "text-blue-200 mb-6", list: "space-y-2 text-sm", cta: "bg-white text-blue-700 hover:bg-blue-50" }
-    : { card: "bg-white rounded-xl border p-8", note: "text-gray-500 mb-6", list: "space-y-2 text-gray-700 text-sm", cta: "bg-gray-900 text-white hover:bg-gray-800" };
+    : { card: "bg-white rounded-xl border p-8 text-gray-900", note: "text-gray-500 mb-6", list: "space-y-2 text-gray-700 text-sm", cta: "bg-gray-900 text-white hover:bg-gray-800" };
   return (
     <div className={tone.card}>
       <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
@@ -76,14 +76,14 @@ export default function LandingPage() {
       {/* How it works — homeowners */}
       <section id="how-it-works" className="py-20 px-6 bg-white">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Three steps to a roof report</h2>
+          <h2 className="text-3xl font-bold text-center text-blue-700 mb-12">Three steps to a roof report</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {content.steps.map(({ step, title, desc }) => (
               <div key={step} className="flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-blue-700 text-white flex items-center justify-center text-xl font-bold mb-4">
                   {step}
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{title}</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
                 <p className="text-gray-600">{desc}</p>
               </div>
             ))}
@@ -94,7 +94,7 @@ export default function LandingPage() {
       {/* Pricing */}
       <section className="py-20 px-6 bg-gray-50">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-4">Simple pricing for homeowners</h2>
+          <h2 className="text-3xl font-bold text-center text-blue-700 mb-4">Simple pricing for homeowners</h2>
           <p className="text-center text-gray-500 mb-12">{content.pricing.intro}</p>
           <div className={`grid grid-cols-1 gap-8 ${content.pricing.plans.length > 1 ? "md:grid-cols-2" : "max-w-md mx-auto"}`}>
             {content.pricing.plans.map((plan) => <PlanCard key={plan.name} plan={plan} />)}
