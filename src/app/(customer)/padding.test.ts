@@ -17,11 +17,13 @@ describe("phone padding on the customer pages (BL-078 / SPEC-027 C3)", () => {
   });
 
   it.each([
+    "src/app/(customer)/dashboard/page.tsx",
     "src/app/(customer)/properties/new/page.tsx",
+    "src/app/(customer)/properties/[id]/page.tsx",
     "src/app/(customer)/surveys/new/page.tsx",
     "src/app/(customer)/surveys/[id]/page.tsx",
     "src/app/(customer)/surveys/[id]/report/page.tsx",
-  ])("%s uses p-4 md:p-8", (path) => {
+  ])("%s, which had a bare p-8, uses p-4 md:p-8", (path) => {
     expect(readFileSync(path, "utf8")).toContain("p-4 md:p-8");
   });
 });
