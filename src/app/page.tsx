@@ -20,7 +20,7 @@ function PlanCard({ plan }: { plan: Plan }) {
       <ul className={tone.list}>
         {plan.features.map((f) => <li key={f}>✓ {f}</li>)}
       </ul>
-      <Link href="/register?role=customer" className={`mt-8 block text-center px-6 py-2.5 rounded-lg text-sm font-medium ${tone.cta}`}>
+      <Link href="/login" className={`mt-8 block text-center px-6 py-2.5 rounded-lg text-sm font-medium ${tone.cta}`}>
         {plan.cta}
       </Link>
     </div>
@@ -44,7 +44,7 @@ export default function LandingPage() {
           <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">
             Sign in
           </Link>
-          <Link href="/register" className="text-sm bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800">
+          <Link href="/login" className="text-sm bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800">
             Get started
           </Link>
         </div>
@@ -62,7 +62,7 @@ export default function LandingPage() {
         </p>
         <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
           <Link
-            href="/register?role=customer"
+            href="/login"
             className="bg-blue-700 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-800"
           >
             Start free survey

@@ -29,7 +29,7 @@ export default function BlogIndexPage() {
             Sign in
           </Link>
           <Link
-            href="/register"
+            href="/login"
             className="text-sm bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800"
           >
             Get started

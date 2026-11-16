@@ -32,7 +32,7 @@ export default function BlogPost3DDemo() {
             Sign in
           </Link>
           <Link
-            href="/register"
+            href="/login"
             className="text-sm bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-800"
           >
             Get started
@@ -296,13 +296,13 @@ export default function BlogPost3DDemo() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/register?role=customer&type=drone"
+              href="/login"
               className="bg-white text-blue-700 font-semibold px-6 py-3 rounded-lg hover:bg-blue-50 transition-colors"
             >
               Book a Drone Survey
             </Link>
             <Link
-              href="/register?role=customer"
+              href="/login"
               className="border border-blue-400 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors"
             >
               Upload Your Own Images
